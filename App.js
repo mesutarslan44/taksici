@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView, Dimensions, StatusBar, BackHandler, Image, PixelRatio, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView, Dimensions, StatusBar, BackHandler, Image, PixelRatio, Alert, Modal, TouchableWithoutFeedback } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PASSENGERS } from './passengers';
 import { TaxiInterior } from './TaxiInterior';
 import { ShopScreen } from './ShopScreen';
@@ -10,7 +11,9 @@ import { DEFAULT_OWNED, DEFAULT_EQUIPPED, SHOP_ITEMS, SPECIAL_COMBOS } from './s
 import { TaksiDurApp } from './TaksiDurApp';
 import { RestScreen, FuelScreen, BreakScreen } from './RestScreens';
 import DrivingGame from './DrivingGame';
-import { getTimeEmoji, formatHour } from './GameManager';
+import { getTimeEmoji, getTimeLabel, formatHour } from './GameManager';
+import { SettingsScreen } from './SettingsScreen';
+import { triggerReputationChange, triggerAccident, triggerNewRank } from './haptics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -62,6 +65,191 @@ const COMPLETED_STORIES_KEY = '@taksici_completed_stories';
 const INVENTORY_KEY = '@taksici_inventory';
 const EQUIPPED_KEY = '@taksici_equipped';
 const MANAGER_KEY = '@taksici_manager';
+const DAILY_QUESTS_KEY = '@taksici_daily_quests';
+const LAST_QUEST_RESET_KEY = '@taksici_last_quest_reset';
+const ACHIEVEMENTS_KEY = '@taksici_achievements';
+const SETTINGS_KEY = '@taksici_settings';
+
+// Varsayılan ayarlar
+const DEFAULT_SETTINGS = {
+  musicVolume: 0.5,
+  effectVolume: 0.7,
+  vibrationEnabled: true,
+  textSpeed: 20,
+  fontSize: 'normal',
+  highContrast: false,
+};
+
+// Başarılar (Achievements) Sistemi – check(state, ending, completedStories) doğru veriyle çağrılıyor
+const ACHIEVEMENTS = [
+  // İlk adımlar
+  {
+    id: 'first_5_rides',
+    name: 'İlk Beş Yolcu',
+    description: '5 yolcu taşıdın',
+    emoji: '🚕',
+    color: '#6b8e23',
+    check: (state) => (state?.rides ?? 0) >= 5,
+  },
+  {
+    id: 'first_normal_ending',
+    name: 'İyi Son',
+    description: 'İlk kez normal (iyi) bir sonla bitirdin',
+    emoji: '✨',
+    color: '#4ecdc4',
+    check: (state, ending) => ending?.type === 'normal',
+  },
+  {
+    id: 'five_stories',
+    name: 'Beş Hikaye',
+    description: '5 hikâyeyi tamamladın',
+    emoji: '📖',
+    color: '#8a8a9a',
+    check: (state, ending, completedStories) => (completedStories?.length ?? 0) >= 5,
+  },
+  // Para
+  {
+    id: 'first_10k',
+    name: 'İlk 10.000₺',
+    description: '10.000₺ kazandın',
+    emoji: '💰',
+    color: '#ffc857',
+    check: (state) => (state?.money ?? 0) >= 10000,
+  },
+  {
+    id: 'money_25k',
+    name: '25.000₺',
+    description: 'Kasanda 25.000₺ biriktirdin',
+    emoji: '💵',
+    color: '#ffc857',
+    check: (state) => (state?.money ?? 0) >= 25000,
+  },
+  {
+    id: 'money_50k',
+    name: '50.000₺',
+    description: '50.000₺ kazandın',
+    emoji: '🏦',
+    color: '#ffd700',
+    check: (state) => (state?.money ?? 0) >= 50000,
+  },
+  // İtibar
+  {
+    id: 'reputation_100',
+    name: 'İtibar 100',
+    description: 'İtibarın 100\'e ulaştı',
+    emoji: '⭐',
+    color: '#4ecdc4',
+    check: (state) => (state?.reputation ?? 0) >= 100,
+  },
+  {
+    id: 'reputation_500',
+    name: 'İtibar 500',
+    description: 'İtibarın 500\'e ulaştı',
+    emoji: '🌟',
+    color: '#ffc857',
+    check: (state) => (state?.reputation ?? 0) >= 500,
+  },
+  // Özel sonlar
+  {
+    id: 'first_police',
+    name: 'İlk Polis Sonu',
+    description: 'İlk kez polis sonu aldın',
+    emoji: '👮‍♂️',
+    color: '#3b82f6',
+    check: (state, ending) => ending?.type === 'police',
+  },
+  {
+    id: 'first_hospital',
+    name: 'İlk Hastane Sonu',
+    description: 'İlk kez hastane sonu aldın',
+    emoji: '🏥',
+    color: '#ef4444',
+    check: (state, ending) => ending?.type === 'hospital',
+  },
+  {
+    id: 'first_court',
+    name: 'İlk Adliye Sonu',
+    description: 'İlk kez adliye sonu aldın',
+    emoji: '⚖️',
+    color: '#fbbf24',
+    check: (state, ending) => ending?.type === 'court',
+  },
+  // Hikaye ilerlemesi
+  {
+    id: 'ten_stories',
+    name: 'On Hikaye',
+    description: '10 hikâyeyi tamamladın',
+    emoji: '📚',
+    color: '#9d4edd',
+    check: (state, ending, completedStories) => (completedStories?.length ?? 0) >= 10,
+  },
+  {
+    id: 'half_stories',
+    name: 'Yarı Yol',
+    description: 'Hikâyelerin yarısını tamamladın',
+    emoji: '🎯',
+    color: '#9d4edd',
+    check: (state, ending, completedStories) =>
+      (completedStories?.length ?? 0) >= Math.ceil((PASSENGERS?.length ?? 30) / 2),
+  },
+  {
+    id: 'all_stories',
+    name: 'Tüm Hikâyeler',
+    description: 'Tüm hikâyeleri tamamladın',
+    emoji: '📚',
+    color: '#9d4edd',
+    check: (state, ending, completedStories) =>
+      (completedStories?.length ?? 0) >= (PASSENGERS?.length ?? 30),
+  },
+  // Yolcu sayısı
+  {
+    id: 'first_25_rides',
+    name: '25 Yolcu',
+    description: '25 yolcu taşıdın',
+    emoji: '🚖',
+    color: '#6b8e23',
+    check: (state) => (state?.rides ?? 0) >= 25,
+  },
+  // Negatif
+  {
+    id: 'negative_reputation',
+    name: 'Kara Liste',
+    description: 'İtibarın -50\'nin altına düştü',
+    emoji: '💀',
+    color: '#1a1a1a',
+    check: (state) => (state?.reputation ?? 0) < -50,
+  },
+];
+
+// Günlük Görevler Sistemi
+const getNextRank = (reputation) => {
+  const currentRank = getReputationRank(reputation);
+  const currentIndex = REPUTATION_RANKS.findIndex(r => r.min === currentRank.min);
+  if (currentIndex < REPUTATION_RANKS.length - 1) {
+    return REPUTATION_RANKS[currentIndex + 1];
+  }
+  return null; // En yüksek rütbedesin
+};
+
+const getReputationToNextRank = (reputation) => {
+  const nextRank = getNextRank(reputation);
+  if (!nextRank) return null;
+  return nextRank.min - reputation;
+};
+
+// Rütbe ilerleme yüzdesini hesapla
+const getReputationProgress = (reputation) => {
+  const currentRank = getReputationRank(reputation);
+  const nextRank = getNextRank(reputation);
+  if (!nextRank) return 100; // En yüksek rütbedesin
+
+  const currentRankMin = currentRank.min;
+  const nextRankMin = nextRank.min;
+  const range = nextRankMin - currentRankMin;
+  const progress = reputation - currentRankMin;
+
+  return Math.min(100, Math.max(0, (progress / range) * 100));
+};
 
 // Yağmur Damlası
 const RainDrop = ({ delay, duration, left, isRaining }) => {
@@ -107,12 +295,10 @@ function GameScreen() {
   // KONUM SİSTEMİ
   const [lastLocation, setLastLocation] = useState('Taksim'); // Varsayılan başlangıç
 
-  const [radioChannelIndex, setRadioChannelIndex] = useState(0); // Artık kullanılmıyor ama state yapısını bozmamak için kalsın veya silebiliriz (temizlemek daha iyi)
   const [isRaining, setIsRaining] = useState(true);
   // Radio states removed
   const [allStoriesCompleted, setAllStoriesCompleted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
 
   const [ownedItems, setOwnedItems] = useState(DEFAULT_OWNED);
   const [equippedItems, setEquippedItems] = useState(DEFAULT_EQUIPPED);
@@ -128,19 +314,95 @@ function GameScreen() {
     ridesThisShift: 0,
   });
 
+  // Günlük Görevler State
+  const [dailyQuests, setDailyQuests] = useState({
+    ridesToday: 0,
+    nightRides: 0,
+    policeFreeRides: 0,
+    lastResetDay: null,
+  });
+
+  // Başarılar (Achievements) State
+  const [achievements, setAchievements] = useState({});
+
   // Mini-Game State
   const [pendingNextChoice, setPendingNextChoice] = useState(null);
   const [pendingFailChoice, setPendingFailChoice] = useState(null);
 
+  // Tooltip Modal State
+  const [tooltipModal, setTooltipModal] = useState({ visible: false, type: null });
+
+  // Diyalog Geçmişi State
+  const [dialogueHistory, setDialogueHistory] = useState([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Typewriter Effect State
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [canSkipTyping, setCanSkipTyping] = useState(false);
+  const typewriterTimeoutRef = useRef(null);
+  const typingIndexRef = useRef(0);
+
+  // Settings State
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [previousReputation, setPreviousReputation] = useState(null);
+  const [previousRank, setPreviousRank] = useState(null);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const choicesAnim = useRef(new Animated.Value(0)).current;
-  const isMutedRef = useRef(isMuted);
+  const ambientTimeoutsRef = useRef([]);
+  const rainSoundRef = useRef(null);
+  const trafficSoundRef = useRef(null);
+  const citySoundRef = useRef(null);
+
+  const scheduleAmbientTimeout = (callback, delay) => {
+    const timeoutId = setTimeout(() => {
+      ambientTimeoutsRef.current = ambientTimeoutsRef.current.filter(id => id !== timeoutId);
+      callback();
+    }, delay);
+    ambientTimeoutsRef.current.push(timeoutId);
+    return timeoutId;
+  };
+
+  const clearAmbientTimeouts = () => {
+    ambientTimeoutsRef.current.forEach(clearTimeout);
+    ambientTimeoutsRef.current = [];
+  };
 
   // Manager kaydet/yükle
   useEffect(() => {
     loadManagerState();
+    loadDailyQuests();
+    loadAchievements();
+    loadSettings();
   }, []);
+
+  // Ayarları yükle
+  const loadSettings = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(SETTINGS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+      }
+    } catch (e) {
+      console.log('Settings load error:', e);
+    }
+  };
+
+  // Ayarlar değiştiğinde ses seviyelerini güncelle
+  useEffect(() => {
+    if (rainSound) {
+      rainSound.setVolumeAsync(settings.musicVolume * 0.3);
+    }
+    if (trafficSound) {
+      trafficSound.setVolumeAsync(settings.effectVolume * 0.15);
+    }
+    if (citySound) {
+      citySound.setVolumeAsync(settings.effectVolume * 0.12);
+    }
+  }, [settings.musicVolume, settings.effectVolume, rainSound, trafficSound, citySound]);
 
   const loadManagerState = async () => {
     try {
@@ -155,6 +417,115 @@ function GameScreen() {
     } catch (e) { console.log('Manager save error:', e); }
   };
 
+  // Günlük Görevler Yükleme ve Sıfırlama
+  const loadDailyQuests = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(DAILY_QUESTS_KEY);
+      const lastReset = await AsyncStorage.getItem(LAST_QUEST_RESET_KEY);
+      const today = new Date().toDateString();
+
+      if (saved && lastReset === today) {
+        setDailyQuests(JSON.parse(saved));
+      } else {
+        // Yeni gün, görevleri sıfırla
+        const newQuests = {
+          ridesToday: 0,
+          nightRides: 0,
+          policeFreeRides: 0,
+          lastResetDay: today,
+        };
+        setDailyQuests(newQuests);
+        await AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(newQuests));
+        await AsyncStorage.setItem(LAST_QUEST_RESET_KEY, today);
+      }
+    } catch (e) { console.log('Daily quests load error:', e); }
+  };
+
+  const saveDailyQuests = async (newQuests) => {
+    try {
+      await AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(newQuests));
+    } catch (e) { console.log('Daily quests save error:', e); }
+  };
+
+  // Başarılar Yükleme ve Kaydetme
+  const loadAchievements = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(ACHIEVEMENTS_KEY);
+      if (saved) {
+        setAchievements(JSON.parse(saved));
+      }
+    } catch (e) { console.log('Achievements load error:', e); }
+  };
+
+  const saveAchievements = async (newAchievements) => {
+    try {
+      await AsyncStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(newAchievements));
+    } catch (e) { console.log('Achievements save error:', e); }
+  };
+
+  // Başarı Kontrolü
+  const checkAchievements = (ending = null, currentState = null, currentCompleted = null) => {
+    const stateToCheck = currentState || gameState;
+    const completedToCheck = currentCompleted !== null ? currentCompleted : completedStories;
+
+    setAchievements(prev => {
+      const newAchievements = { ...prev };
+      let hasNewAchievement = false;
+
+      ACHIEVEMENTS.forEach(achievement => {
+        // Eğer zaten kazanılmışsa atla
+        if (newAchievements[achievement.id]) return;
+
+        // Kontrol et
+        if (achievement.check(stateToCheck, ending, completedToCheck)) {
+          newAchievements[achievement.id] = {
+            unlocked: true,
+            unlockedAt: new Date().toISOString(),
+          };
+          hasNewAchievement = true;
+        }
+      });
+
+      if (hasNewAchievement) {
+        saveAchievements(newAchievements);
+      }
+
+      return newAchievements;
+    });
+  };
+
+  const updateDailyQuests = (ending, hour = manager.hour) => {
+    const today = new Date().toDateString();
+
+    setDailyQuests(prev => {
+      const newQuests = { ...prev };
+
+      // Eğer bugün değilse, görevleri sıfırla
+      if (prev.lastResetDay !== today) {
+        newQuests.ridesToday = 0;
+        newQuests.nightRides = 0;
+        newQuests.policeFreeRides = 0;
+        newQuests.lastResetDay = today;
+      }
+
+      // Bugün 5 yolcu taşı
+      newQuests.ridesToday = newQuests.ridesToday + 1;
+
+      // Gece 3 yolculuk yap (gece saatleri: 21-06 arası)
+      if (hour >= 21 || hour < 6) {
+        newQuests.nightRides = newQuests.nightRides + 1;
+      }
+
+      // Polissiz 10 sefer (ending type 'police' değilse)
+      if (!ending || ending.type !== 'police') {
+        newQuests.policeFreeRides = newQuests.policeFreeRides + 1;
+      }
+
+      saveDailyQuests(newQuests);
+      return newQuests;
+    });
+  };
+
   // Gün zamanı hesapla
   const calculateDayTime = (hour) => {
     if (hour >= 6 && hour < 12) return 'morning';
@@ -166,7 +537,7 @@ function GameScreen() {
   // Geri tuşu handler
   useEffect(() => {
     const backAction = () => {
-      if (screen === 'shop' || screen === 'taksidur' || screen === 'rest' || screen === 'fuel' || screen === 'break') {
+      if (screen === 'settings' || screen === 'shop' || screen === 'taksidur' || screen === 'rest' || screen === 'fuel' || screen === 'break' || screen === 'achievements') {
         setScreen('menu');
         return true;
       } else if (screen === 'passenger') {
@@ -185,6 +556,45 @@ function GameScreen() {
     return () => backHandler.remove();
   }, [screen]);
 
+  // Font boyutu çarpanı
+  const getFontSizeMultiplier = () => {
+    switch (settings.fontSize) {
+      case 'small': return 0.85;
+      case 'large': return 1.25;
+      default: return 1.0;
+    }
+  };
+
+  const fontSizeMultiplier = getFontSizeMultiplier();
+
+  // Kontrast renkleri
+  const getTextColor = () => {
+    if (settings.highContrast) {
+      return COLORS.text; // Daha parlak beyaz
+    }
+    return COLORS.text;
+  };
+
+  const getCardBgColor = () => {
+    if (settings.highContrast) {
+      return COLORS.bgLight; // Daha açık arka plan
+    }
+    return COLORS.card;
+  };
+
+  const getDialogueBoxStyle = () => {
+    if (settings.highContrast) {
+      return {
+        backgroundColor: 'rgba(37, 37, 50, 0.95)',
+        borderWidth: 2,
+        borderColor: COLORS.accent,
+      };
+    }
+    return {
+      backgroundColor: 'rgba(26,26,36,0.9)',
+    };
+  };
+
   useEffect(() => {
     fadeAnim.setValue(0); slideAnim.setValue(50);
     Animated.parallel([
@@ -197,39 +607,83 @@ function GameScreen() {
     }
   }, [screen, isThinking]);
 
+  // Diyalog değiştiğinde typewriter efekti başlat
+  useEffect(() => {
+    if (screen === 'dialogue' && gameState.currentPassenger && !isThinking) {
+      const dialogue = gameState.currentPassenger.dialogue[gameState.dialogueIndex];
+      if (dialogue?.text) {
+        // Önceki timeout'u temizle
+        if (typewriterTimeoutRef.current) {
+          clearTimeout(typewriterTimeoutRef.current);
+        }
+        // Her durumda yeniden başlat
+        startTypewriterEffect(dialogue.text);
+      }
+    }
+
+    // Cleanup
+    return () => {
+      if (typewriterTimeoutRef.current) {
+        clearTimeout(typewriterTimeoutRef.current);
+      }
+    };
+  }, [gameState.dialogueIndex, gameState.currentPassenger, screen, isThinking]);
+
   useEffect(() => {
     loadGameState();
     loadRainSound();
     return () => {
-      if (rainSound) rainSound.unloadAsync();
-      if (trafficSound) trafficSound.unloadAsync();
-      if (citySound) citySound.unloadAsync();
+      clearAmbientTimeouts();
+      rainSoundRef.current?.unloadAsync?.();
+      trafficSoundRef.current?.unloadAsync?.();
+      citySoundRef.current?.unloadAsync?.();
     };
   }, []);
 
-  // Ortam sesleri döngüsü
+  // Ortam sesleri döngüsü - Ayarlardan ses seviyelerini kullan
   useEffect(() => {
-    const ambientCycle = async () => {
-      setIsRaining(true);
-      if (rainSound && !isMutedRef.current) await rainSound.playAsync();
+    clearAmbientTimeouts();
+    let isCancelled = false;
 
-      setTimeout(async () => {
+    const ambientCycle = async () => {
+      if (isCancelled) return;
+
+      setIsRaining(true);
+      if (rainSound && settings.musicVolume > 0) {
+        await rainSound.setVolumeAsync(settings.musicVolume * 0.3);
+        await rainSound.playAsync();
+      }
+
+      scheduleAmbientTimeout(async () => {
+        if (isCancelled) return;
         setIsRaining(false);
         if (rainSound) await rainSound.pauseAsync();
 
-        setTimeout(async () => {
-          if (trafficSound && !isMutedRef.current) await trafficSound.playAsync();
+        scheduleAmbientTimeout(async () => {
+          if (isCancelled) return;
+          if (trafficSound && settings.effectVolume > 0) {
+            await trafficSound.setVolumeAsync(settings.effectVolume * 0.15);
+            await trafficSound.playAsync();
+          }
 
-          setTimeout(async () => {
+          scheduleAmbientTimeout(async () => {
+            if (isCancelled) return;
             if (trafficSound) await trafficSound.pauseAsync();
 
-            setTimeout(async () => {
-              if (citySound && !isMutedRef.current) await citySound.playAsync();
+            scheduleAmbientTimeout(async () => {
+              if (isCancelled) return;
+              if (citySound && settings.effectVolume > 0) {
+                await citySound.setVolumeAsync(settings.effectVolume * 0.12);
+                await citySound.playAsync();
+              }
 
-              setTimeout(async () => {
+              scheduleAmbientTimeout(async () => {
+                if (isCancelled) return;
                 if (citySound) await citySound.pauseAsync();
 
-                setTimeout(() => { ambientCycle(); }, 60000);
+                scheduleAmbientTimeout(() => {
+                  if (!isCancelled) ambientCycle();
+                }, 60000);
               }, 20000);
             }, 40000);
           }, 20000);
@@ -237,9 +691,12 @@ function GameScreen() {
       }, 15000);
     };
 
-    const timer = setTimeout(ambientCycle, 1000);
-    return () => clearTimeout(timer);
-  }, [rainSound, trafficSound, citySound]);
+    scheduleAmbientTimeout(ambientCycle, 1000);
+    return () => {
+      isCancelled = true;
+      clearAmbientTimeouts();
+    };
+  }, [rainSound, trafficSound, citySound, settings.musicVolume, settings.effectVolume]);
 
   // Taksimetre animasyonu
   // Taksimetre animasyonu - Gerçekçi Artış
@@ -272,6 +729,7 @@ function GameScreen() {
         { uri: 'https://assets.mixkit.co/active_storage/sfx/2515/2515-preview.mp3' },
         { shouldPlay: false, isLooping: true, volume: 0.3 }
       );
+      rainSoundRef.current = rain;
       setRainSound(rain);
 
       // Trafik Sesi - Yerel dosya
@@ -279,41 +737,23 @@ function GameScreen() {
         require('./assets/sounds/traffic.mp3'),
         { shouldPlay: false, isLooping: true, volume: 0.15 }
       );
+      trafficSoundRef.current = traffic;
       setTrafficSound(traffic);
 
-      // Şehir Ambiyansı - Yerel dosya
+      // Sehir Ambiyansi - Yerel dosya
       const { sound: city } = await Audio.Sound.createAsync(
         require('./assets/sounds/city.mp3'),
         { shouldPlay: false, isLooping: true, volume: 0.12 }
       );
+      citySoundRef.current = city;
       setCitySound(city);
     } catch (e) { console.log('Sound load error:', e); }
   };
 
   // Radyo fonksiyonları silindi
 
-  // MUTE/UNMUTE - Tüm sesleri anında sustur
-  const toggleMute = async () => {
-    const newMuted = !isMuted;
-    setIsMuted(newMuted);
-    isMutedRef.current = newMuted; // Ref'i de güncelle
-
-    try {
-      if (newMuted) {
-        // Tüm sesleri durdur
-        if (rainSound) await rainSound.pauseAsync();
-        if (trafficSound) await trafficSound.pauseAsync();
-        if (citySound) await citySound.pauseAsync();
-        if (citySound) await citySound.pauseAsync();
-        // Radyo silindi
-      } else {
-        // Sesleri devam ettir (eğer ilgili state aktifse)
-        if (rainSound && isRaining) await rainSound.playAsync();
-      }
-    } catch (e) {
-      console.log('Mute toggle error:', e);
-    }
-  };
+  // MUTE/UNMUTE - Artık ayarlar ekranından kontrol ediliyor
+  // Eski toggleMute fonksiyonu kaldırıldı
 
   const loadGameState = async () => {
     try {
@@ -323,8 +763,17 @@ function GameScreen() {
       const equipped = await AsyncStorage.getItem(EQUIPPED_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setGameState(prev => ({ ...prev, money: parsed.money || 250, rides: parsed.rides || 0, reputation: parsed.reputation || 50 }));
+        const reputation = parsed.reputation ?? 50;
+        setGameState(prev => ({ ...prev, money: parsed.money ?? 250, rides: parsed.rides ?? 0, reputation }));
         if (parsed.lastLocation) setLastLocation(parsed.lastLocation); // Konum yükle
+        // Önceki itibar ve rütbeyi başlat
+        setPreviousReputation(reputation);
+        setPreviousRank(getReputationRank(reputation));
+      } else {
+        // İlk başlatma
+        const initialReputation = 50;
+        setPreviousReputation(initialReputation);
+        setPreviousRank(getReputationRank(initialReputation));
       }
       if (completed) setCompletedStories(JSON.parse(completed));
       if (inventory) setOwnedItems(JSON.parse(inventory));
@@ -390,6 +839,11 @@ function GameScreen() {
     setScreen('taksidur');
   };
 
+  // Taksimetre artışı callback'i
+  const handleTaximeterIncrease = (amount) => {
+    setTaximeterAmount(prev => prev + amount);
+  };
+
   // TaksiDur'dan yolcu seçildi
   const handleSelectPassenger = (passenger) => {
     setGameState(prev => ({ ...prev, currentPassenger: passenger, dialogueIndex: 0 }));
@@ -406,10 +860,10 @@ function GameScreen() {
           {
             text: "YARIŞA BAŞLA",
             onPress: () => {
-              // Özel bir pending state ayarlamaya gerek yok, sadece ekranı açıyoruz.
-              // handleMiniGameResult zaten "passenger" ekranına atıyor.
-              // Sadece 'success' durumunda ekstra para verelim mi?
-              // Şimdilik sadece oyunu açalım.
+              // -1 özel değer: meydan okuma modu
+              // handleMiniGameResult bunu kontrol edecek ve passenger ekranına yönlendirecek
+              setPendingNextChoice(-1);
+              setPendingFailChoice(-1);
               setScreen('driving_game');
             }
           }
@@ -440,6 +894,9 @@ function GameScreen() {
     };
     setManager(newManager);
     saveManagerState(newManager);
+
+    // Günlük görevleri güncelle (yeni saat ile)
+    updateDailyQuests(ending, newHour);
   };
 
   // Dinlenme
@@ -464,6 +921,11 @@ function GameScreen() {
       setGameState(newState);
       saveGameState(newState);
 
+      // Başarıları kontrol et (para değişti)
+      setTimeout(() => {
+        checkAchievements(null, newState, completedStories);
+      }, 100);
+
       const newManager = { ...manager, fuel: 100 };
       setManager(newManager);
       saveManagerState(newManager);
@@ -477,6 +939,11 @@ function GameScreen() {
       const newState = { ...gameState, money: gameState.money - cost };
       setGameState(newState);
       saveGameState(newState);
+
+      // Başarıları kontrol et (para değişti)
+      setTimeout(() => {
+        checkAchievements(null, newState, completedStories);
+      }, 100);
 
       const energyBoost = type === 'coffee' ? 25 : 15;
       const newManager = {
@@ -496,7 +963,54 @@ function GameScreen() {
     await AsyncStorage.removeItem(COMPLETED_STORIES_KEY);
   };
 
-  const acceptPassenger = () => setScreen('dialogue');
+  const acceptPassenger = () => {
+    setScreen('dialogue');
+    // İlk diyalog için geçmişi sıfırla
+    setDialogueHistory([]);
+    // Typewriter efekti useEffect'te başlayacak
+  };
+
+  // Typewriter Effect Fonksiyonu
+  const startTypewriterEffect = (fullText) => {
+    setIsTyping(true);
+    setCanSkipTyping(false);
+    setDisplayedText('');
+    typingIndexRef.current = 0;
+
+    const typingSpeed = settings.textSpeed || 20; // Güvenli fallback
+
+    const type = () => {
+      const currentIndex = typingIndexRef.current;
+      if (currentIndex < fullText.length) {
+        setDisplayedText(fullText.substring(0, currentIndex + 1));
+        typingIndexRef.current = currentIndex + 1;
+        typewriterTimeoutRef.current = setTimeout(type, typingSpeed);
+      } else {
+        setIsTyping(false);
+        setCanSkipTyping(false);
+      }
+
+      // İlk birkaç karakterden sonra skip edilebilir
+      if (currentIndex > 10) {
+        setCanSkipTyping(true);
+      }
+    };
+
+    type();
+  };
+
+  // Typewriter'i skip et
+  const skipTypewriter = () => {
+    if (typewriterTimeoutRef.current) {
+      clearTimeout(typewriterTimeoutRef.current);
+    }
+    const currentDialogue = gameState.currentPassenger?.dialogue[gameState.dialogueIndex];
+    if (currentDialogue?.text) {
+      setDisplayedText(currentDialogue.text);
+      setIsTyping(false);
+      setCanSkipTyping(false);
+    }
+  };
 
   // Radyoyu durdur (diyalog bittiğinde otomatik kapanması için)
   // stopRadio fonksiyonu silindi
@@ -521,7 +1035,7 @@ function GameScreen() {
     if (ending) {
       setCurrentEnding(ending);
       setScreen('ending');
-      completeRideAndUpdate(ending);
+      completeRideAndUpdate(ending); // Bu fonksiyon içinde updateDailyQuests çağrılıyor
 
       // Radyo kapatma silindi
 
@@ -544,14 +1058,36 @@ function GameScreen() {
         ...gameState,
         money: gameState.money + earnedMoney,
         rides: gameState.rides + 1,
-        reputation: Math.max(0, gameState.reputation + earnedRep), // Sınırsız itibar
+        reputation: gameState.reputation + earnedRep, // Negatif itibara izin ver
         currentEnding: ending
       };
+
+      // İtibar değişimi için haptik geri bildirim
+      const repChange = newState.reputation - gameState.reputation;
+      if (previousReputation !== null && Math.abs(repChange) > 0) {
+        triggerReputationChange(repChange, settings.vibrationEnabled);
+      }
+
+      // Yeni rütbe kontrolü
+      const oldRank = previousRank || getReputationRank(gameState.reputation);
+      const newRank = getReputationRank(newState.reputation);
+      if (previousRank !== null && oldRank.min !== newRank.min) {
+        triggerNewRank(settings.vibrationEnabled);
+      }
+
+      setPreviousReputation(newState.reputation);
+      setPreviousRank(newRank);
       setGameState(newState);
       saveGameState(newState);
       if (newCompleted.length > completedStories.length) {
         AsyncStorage.setItem(COMPLETED_STORIES_KEY, JSON.stringify(newCompleted));
       }
+
+      // Başarıları kontrol et (yeni state ile)
+      setTimeout(() => {
+        checkAchievements(ending, newState, newCompleted);
+      }, 100);
+
       return;
     }
 
@@ -560,13 +1096,24 @@ function GameScreen() {
       console.warn('Invalid nextIndex or dialogue not found, returning to menu.');
       setGameState(prev => ({ ...prev, currentPassenger: null }));
       setScreen('menu');
-      setScreen('menu');
-      // stopRadio silindi
       return;
     }
 
     setIsThinking(true);
     choicesAnim.setValue(0);
+
+    // Diyalog geçmişine ekle
+    const currentDialogueStep = gameState.currentPassenger?.dialogue[gameState.dialogueIndex];
+    if (currentDialogueStep) {
+      const selectedChoice = currentDialogueStep.choices?.find(c => c.next === nextIndex);
+      if (selectedChoice) {
+        setDialogueHistory(prev => [
+          ...prev.slice(-4), // Son 4'ü tut
+          { type: 'passenger', text: currentDialogueStep.text, speaker: gameState.currentPassenger.name },
+          { type: 'player', text: selectedChoice.text, speaker: 'Sen' }
+        ]);
+      }
+    }
 
     const delay = 500;
 
@@ -574,6 +1121,13 @@ function GameScreen() {
       setIsThinking(false);
       setGameState(prev => ({ ...prev, dialogueIndex: nextIndex }));
       Animated.timing(choicesAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+
+      // Yeni diyalog için typewriter efekti başlat
+      // useEffect tarafından otomatik tetiklenecek
+      // const nextDialogue = gameState.currentPassenger?.dialogue[nextIndex];
+      // if (nextDialogue?.text) {
+      //   startTypewriterEffect(nextDialogue.text);
+      // }
     }, delay);
   };
 
@@ -595,6 +1149,11 @@ function GameScreen() {
     setEquippedItems(newEquipped);
     saveGameState(newState);
     saveInventory(newOwned, newEquipped);
+
+    // Başarıları kontrol et (para değişti)
+    setTimeout(() => {
+      checkAchievements(null, newState, completedStories);
+    }, 100);
   };
 
   const handleEquip = (itemId, category) => {
@@ -615,21 +1174,40 @@ function GameScreen() {
       return;
     }
 
-    // Önce ekranı değiştir ki render hatası olmasın
-    setScreen('passenger');
+    // Mini game sonrasında hangi diyaloğa gidileceğini belirle
+    const nextDialogueIndex = success ? pendingNextChoice : pendingFailChoice;
 
-    // Diyalog geçişini güvenli yap
-    setTimeout(() => {
-      setScreen('dialogue');
-      if (success) {
-        if (pendingNextChoice !== null) handleChoice(pendingNextChoice);
-      } else {
-        if (pendingFailChoice !== null) handleChoice(pendingFailChoice);
+    // Reset pending states
+    setPendingNextChoice(null);
+    setPendingFailChoice(null);
+
+    // MEYDAN OKUMA MODU (-1): Passenger ekranına git
+    if (nextDialogueIndex === -1) {
+      Alert.alert(
+        success ? "BAŞARILI! 🎉" : "EH, İDARE EDER 😅",
+        success ? "Harika sürüş! Şimdi yolcunu al." : "Olsun, bir dahaki sefere daha iyi olur. Yolcunu al.",
+        [{ text: "TAMAM", onPress: () => setScreen('passenger') }]
+      );
+      return;
+    }
+
+    // Normal diyalog içi mini game: Diyalog ekranına dön
+    setScreen('dialogue');
+
+    if (nextDialogueIndex !== null && nextDialogueIndex >= 0) {
+      // Diyaloğu doğrudan ilerlet (handleChoice'u çağırmadan)
+      setGameState(prev => ({ ...prev, dialogueIndex: nextDialogueIndex }));
+
+      // Diyalog geçmişine ekle
+      const currentDialogue = gameState.currentPassenger.dialogue[gameState.dialogueIndex];
+      if (currentDialogue) {
+        setDialogueHistory(prev => [
+          ...prev,
+          { type: 'passenger', text: currentDialogue.text, speaker: gameState.currentPassenger.name },
+          { type: 'player', text: success ? '(Makas başarılı!)' : '(Kaza!)', speaker: 'Sen' }
+        ]);
       }
-      // Reset
-      setPendingNextChoice(null);
-      setPendingFailChoice(null);
-    }, 100);
+    }
   };
 
   // MENÜ EKRANI
@@ -640,132 +1218,305 @@ function GameScreen() {
         <Image source={require('./assets/bg_rain_dark.png')} style={{ width: width, height: height }} resizeMode="cover" blurRadius={3} />
       </View>
 
-      {/* Mute Butonu - Sağ Üst */}
-      <TouchableOpacity
-        style={styles.muteBtn}
-        onPress={toggleMute}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.muteBtnText}>{isMuted ? '🔇' : '🔊'}</Text>
-      </TouchableOpacity>
-
-      {/* SIFIRLAMA BUTONU - GÜVENLİ (Onaylı) */}
-      <TouchableOpacity
-        style={[styles.muteBtn, { right: normalize(70), borderColor: COLORS.danger }]}
-        onPress={() => {
-          Alert.alert(
-            "⚠️ İlerlemeyi Sıfırla",
-            "Tüm hikaye geçmişiniz silinecek. '29 hikaye bitti' gibi hatalar düzelecek.\n\nEmin misiniz?",
-            [
-              { text: "Vazgeç", style: "cancel" },
-              {
-                text: "EVET, SİL",
-                style: "destructive",
-                onPress: () => {
-                  resetStories();
-                  console.log("Hikayeler kullanıcı onayıyla sıfırlandı");
+      {/* Üst Butonlar - Sağ Üst - Yan Yana */}
+      <View style={styles.topButtonsRow}>
+        {/* Sıfırlama Butonu - Kırmızı Çerçeveli */}
+        <TouchableOpacity
+          style={styles.resetBtn}
+          onPress={() => {
+            Alert.alert(
+              "⚠️ İlerlemeyi Sıfırla",
+              "Tüm hikaye geçmişiniz silinecek. '29 hikaye bitti' gibi hatalar düzelecek.\n\nEmin misiniz?",
+              [
+                { text: "Vazgeç", style: "cancel" },
+                {
+                  text: "EVET, SİL",
+                  style: "destructive",
+                  onPress: () => {
+                    resetStories();
+                    console.log("Hikayeler kullanıcı onayıyla sıfırlandı");
+                  }
                 }
-              }
-            ]
-          );
-        }}
-        activeOpacity={0.7}
+              ]
+            );
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.resetBtnText}>🗑️</Text>
+        </TouchableOpacity>
+
+        {/* Ayarlar Butonu */}
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => setScreen('settings')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.settingsBtnText}>⚙️</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Kaydırılabilir İçerik */}
+      <ScrollView
+        style={{ flex: 1, width: '100%' }}
+        contentContainerStyle={{ paddingBottom: normalize(40), alignItems: 'center' }}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.muteBtnText}>🗑️</Text>
-      </TouchableOpacity>
 
-      <View style={styles.logo}>
-        <Text style={styles.logoEmoji}>🚖</Text>
-        <Text style={styles.logoText}>TAKSİCİ</Text>
-        <Text style={styles.logoSubtext}>İSTANBUL HİKAYELERİ</Text>
-      </View>
 
-      {/* YENİ: Zaman ve Durum Göstergesi */}
-      <View style={styles.timeBar}>
-        <View style={styles.timeItem}>
-          <Text style={styles.timeEmoji}>{getTimeEmoji(manager.dayTime)}</Text>
-          <Text style={styles.timeText}>{formatHour(manager.hour)}</Text>
-        </View>
-        <View style={styles.timeItem}>
-          <Text style={styles.timeEmoji}>📅</Text>
-          <Text style={styles.timeText}>Gün {manager.day}</Text>
-        </View>
-        <View style={styles.timeItem}>
-          <Text style={styles.timeEmoji}>⚡</Text>
-          <Text style={[styles.timeText, manager.energy <= 20 && styles.timeDanger]}>%{Math.round(manager.energy)}</Text>
-        </View>
-        <View style={styles.timeItem}>
-          <Text style={styles.timeEmoji}>⛽</Text>
-          <Text style={[styles.timeText, manager.fuel <= 20 && styles.timeDanger]}>%{Math.round(manager.fuel)}</Text>
-        </View>
-      </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statBox}><Text style={styles.statValue}>₺{gameState.money}</Text><Text style={styles.statLabel}>KASA</Text></View>
-        <View style={styles.statDivider} />
-        <View style={styles.statBox}><Text style={styles.statValue}>{gameState.rides}</Text><Text style={styles.statLabel}>YOLCU</Text></View>
-        <View style={styles.statDivider} />
-        <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: getReputationRank(gameState.reputation).color }]}>
-            {getReputationRank(gameState.reputation).emoji} {gameState.reputation}
-          </Text>
-          <Text style={[styles.statLabel, { color: getReputationRank(gameState.reputation).color }]}>
-            {getReputationRank(gameState.reputation).name.toUpperCase()}
-          </Text>
+        <View style={styles.logo}>
+          <Text style={styles.logoEmoji}>🚖</Text>
+          <Text style={styles.logoText}>TAKSİCİ</Text>
+          <Text style={styles.logoSubtext}>İSTANBUL HİKAYELERİ</Text>
         </View>
-      </View>
 
-      {calculateBonus() > 0 && (
-        <View style={styles.bonusBadge}>
-          <Text style={styles.bonusText}>+%{calculateBonus()} Bonus Aktif</Text>
+        {/* Zaman ve Durum: Saat + Sabah/Öğle/Akşam/Gece (gündüz/gece anlaşılır olsun) */}
+        <View style={styles.timeBar}>
+          <View style={styles.timeItem}>
+            <Text style={styles.timeEmoji}>{getTimeEmoji(manager.dayTime)}</Text>
+            <Text style={styles.timeText}>{formatHour(manager.hour)}</Text>
+            <Text style={styles.timeLabel}>{getTimeLabel(manager.dayTime)}</Text>
+          </View>
+          <View style={styles.timeItem}>
+            <Text style={styles.timeEmoji}>📅</Text>
+            <Text style={styles.timeText}>Gün {manager.day}</Text>
+            <Text style={styles.timeLabel}>Oyun günü</Text>
+          </View>
+          <View style={styles.timeItem}>
+            <Text style={styles.timeEmoji}>⚡</Text>
+            <Text style={[styles.timeText, manager.energy <= 20 && styles.timeDanger]}>%{Math.round(manager.energy)}</Text>
+          </View>
+          <View style={styles.timeItem}>
+            <Text style={styles.timeEmoji}>⛽</Text>
+            <Text style={[styles.timeText, manager.fuel <= 20 && styles.timeDanger]}>%{Math.round(manager.fuel)}</Text>
+          </View>
         </View>
-      )}
 
-      <Text style={styles.storyCounter}>
-        {allStoriesCompleted ? '✓ Tüm hikayeler tamamlandı!' : `${getAvailableStories().length} hikaye bekliyor`}
-      </Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statBox}>
+            <View style={styles.statHeaderRow}>
+              <Text style={styles.statValue}>₺{gameState.money}</Text>
+              <TouchableOpacity
+                onPress={() => setTooltipModal({ visible: true, type: 'money' })}
+                onLongPress={() => setTooltipModal({ visible: true, type: 'money' })}
+                style={styles.statInfoBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statInfoText}>ℹ️</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.statLabel}>KASA</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <View style={styles.statHeaderRow}>
+              <Text style={styles.statValue}>{gameState.rides}</Text>
+              <TouchableOpacity
+                onPress={() => setTooltipModal({ visible: true, type: 'rides' })}
+                onLongPress={() => setTooltipModal({ visible: true, type: 'rides' })}
+                style={styles.statInfoBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statInfoText}>ℹ️</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.statLabel}>YOLCU</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <View style={styles.statHeaderRow}>
+              <Text style={[styles.statValue, { color: getReputationRank(gameState.reputation).color }]}>
+                {getReputationRank(gameState.reputation).emoji} {gameState.reputation}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setTooltipModal({ visible: true, type: 'reputation' })}
+                onLongPress={() => setTooltipModal({ visible: true, type: 'reputation' })}
+                style={styles.statInfoBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.statInfoText}>ℹ️</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.statLabel, { color: getReputationRank(gameState.reputation).color }]}>
+              {getReputationRank(gameState.reputation).name.toUpperCase()}
+            </Text>
+            {getReputationToNextRank(gameState.reputation) !== null && (
+              <View style={styles.reputationProgressContainer}>
+                <View style={styles.reputationProgressBar}>
+                  <View
+                    style={[
+                      styles.reputationProgressFill,
+                      {
+                        width: `${getReputationProgress(gameState.reputation)}%`,
+                        backgroundColor: getReputationRank(gameState.reputation).color
+                      }
+                    ]}
+                  />
+                </View>
+                <Text style={styles.reputationProgressText}>
+                  {getNextRank(gameState.reputation).name}'e %{Math.round(getReputationProgress(gameState.reputation))} kaldı
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
 
-      {allStoriesCompleted ? (
-        <TouchableOpacity style={[styles.startBtn, { backgroundColor: COLORS.purple }]} onPress={resetStories} activeOpacity={0.8}>
-          <Text style={styles.startBtnText}>HİKAYELERİ SIFIRLA</Text>
+        {/* Günlük Görevler */}
+        <View style={styles.dailyQuestsContainer}>
+          <Text style={styles.dailyQuestsTitle}>📋 GÜNLÜK GÖREVLER</Text>
+          <View style={styles.questItem}>
+            <Text style={styles.questText}>
+              {dailyQuests.ridesToday >= 5 ? '✅' : '⭕'} Bugün 5 yolcu taşı ({dailyQuests.ridesToday}/5)
+            </Text>
+          </View>
+          <View style={styles.questItem}>
+            <Text style={styles.questText}>
+              {dailyQuests.nightRides >= 3 ? '✅' : '⭕'} Gece 3 yolculuk yap ({dailyQuests.nightRides}/3)
+            </Text>
+          </View>
+          <View style={styles.questItem}>
+            <Text style={styles.questText}>
+              {dailyQuests.policeFreeRides >= 10 ? '✅' : '⭕'} Polissiz 10 sefer ({dailyQuests.policeFreeRides}/10)
+            </Text>
+          </View>
+        </View>
+
+        {calculateBonus() > 0 && (
+          <View style={styles.bonusBadge}>
+            <Text style={styles.bonusText}>+%{calculateBonus()} Bonus Aktif</Text>
+          </View>
+        )}
+
+        {/* Başarılar Rozet Satırı - Sadece başarı varsa göster */}
+        {Object.keys(achievements).filter(id => achievements[id]?.unlocked).length > 0 && (
+          <TouchableOpacity
+            style={styles.achievementsRow}
+            onPress={() => setScreen('achievements')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.achievementsRowHeader}>
+              <Text style={styles.achievementsTitle}>🏆 BAŞARILARIM</Text>
+              <Text style={styles.achievementsCount}>
+                {Object.keys(achievements).filter(id => achievements[id]?.unlocked).length}/{ACHIEVEMENTS.length}
+              </Text>
+            </View>
+            <View style={styles.achievementBadgesRow}>
+              {ACHIEVEMENTS.filter(ach => achievements[ach.id]?.unlocked)
+                .slice(0, 5)
+                .map(ach => (
+                  <View key={ach.id} style={styles.achievementBadge}>
+                    <Text style={styles.achievementEmoji}>{ach.emoji}</Text>
+                  </View>
+                ))}
+              {Object.keys(achievements).filter(id => achievements[id]?.unlocked).length > 5 && (
+                <View style={styles.achievementMoreBadge}>
+                  <Text style={styles.achievementMoreText}>+{Object.keys(achievements).filter(id => achievements[id]?.unlocked).length - 5}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.achievementsHint}>Detaylar için dokun →</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.storyCounter}>
+          {allStoriesCompleted ? '✓ Tüm hikayeler tamamlandı!' : `${getAvailableStories().length} hikaye bekliyor`}
+        </Text>
+
+        {allStoriesCompleted ? (
+          <TouchableOpacity style={[styles.startBtn, { backgroundColor: COLORS.purple }]} onPress={resetStories} activeOpacity={0.8}>
+            <Text style={styles.startBtnText}>HİKAYELERİ SIFIRLA</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.ctaButtonContainer}>
+            <Animated.View style={[styles.ctaGlow, { opacity: fadeAnim }]} />
+            <TouchableOpacity style={styles.ctaButton} onPress={startRide} activeOpacity={0.8}>
+              <LinearGradient
+                colors={[COLORS.accent, '#ffd700', COLORS.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.ctaGradient}
+              >
+                <Text style={styles.ctaButtonText}>🚕 TAKSİDUR AÇ</Text>
+                <Text style={styles.ctaButtonSub}>Yolcu seçip yeni hikayeye başla</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Alt Butonlar */}
+        <View style={styles.bottomButtons}>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScreen('break')} activeOpacity={0.8}>
+            <Text style={styles.secondaryBtnEmoji}>☕</Text>
+            <Text style={styles.secondaryBtnText}>MOLA</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScreen('shop')} activeOpacity={0.8}>
+            <Text style={styles.secondaryBtnEmoji}>🏪</Text>
+            <Text style={styles.secondaryBtnText}>MAĞAZA</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScreen('fuel')} activeOpacity={0.8}>
+            <Text style={styles.secondaryBtnEmoji}>⛽</Text>
+            <Text style={styles.secondaryBtnText}>BENZİN</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* TEST SÜRÜŞÜ BUTONU */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#1a1a24',
+            width: '100%',
+            marginBottom: normalize(10),
+            borderColor: COLORS.accent,
+            borderWidth: 2,
+            borderRadius: normalize(12),
+            paddingVertical: normalize(12),
+            alignItems: 'center',
+          }}
+          onPress={() => setScreen('driving_game')}
+          activeOpacity={0.8}
+        >
+          <Text style={{ fontSize: normalize(24), marginBottom: normalize(4) }}>🎮</Text>
+          <Text style={{ fontSize: normalize(12), color: COLORS.accent, fontWeight: 'bold' }}>TEST SÜRÜŞÜ YAP</Text>
         </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={styles.startBtn} onPress={startRide} activeOpacity={0.8}>
-          <Text style={styles.startBtnText}>🚕 TAKSİDUR AÇ</Text>
-          <Text style={styles.startBtnSub}>Yolcu ara ve seç</Text>
-        </TouchableOpacity>
-      )}
 
-      {/* Alt Butonlar */}
-      <View style={styles.bottomButtons}>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScreen('break')} activeOpacity={0.8}>
-          <Text style={styles.secondaryBtnEmoji}>☕</Text>
-          <Text style={styles.secondaryBtnText}>MOLA</Text>
-        </TouchableOpacity>
+        <Text style={styles.footerText}>Her yolcu bir hikaye. Her karar bir sonuç.</Text>
+      </ScrollView>
 
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScreen('shop')} activeOpacity={0.8}>
-          <Text style={styles.secondaryBtnEmoji}>🏪</Text>
-          <Text style={styles.secondaryBtnText}>MAĞAZA</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScreen('fuel')} activeOpacity={0.8}>
-          <Text style={styles.secondaryBtnEmoji}>⛽</Text>
-          <Text style={styles.secondaryBtnText}>BENZİN</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* TEST SÜRÜŞÜ BUTONU (GEÇİCİ) */}
-      <TouchableOpacity
-        style={[styles.secondaryBtn, { backgroundColor: '#1a1a24', width: '100%', marginBottom: 10, borderColor: COLORS.accent }]}
-        onPress={() => setScreen('driving_game')}
-        activeOpacity={0.8}
+      {/* Tooltip Modal */}
+      <Modal
+        visible={tooltipModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setTooltipModal({ visible: false, type: null })}
       >
-        <Text style={{ fontSize: 20, marginBottom: 5 }}>🎮</Text>
-        <Text style={{ fontSize: 12, color: COLORS.accent, fontWeight: 'bold' }}>TEST SÜRÜŞÜ YAP</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.footerText}>Her yolcu bir hikaye. Her karar bir sonuç.</Text>
-    </Animated.View>
+        <TouchableOpacity
+          style={styles.tooltipModalOverlay}
+          activeOpacity={1}
+          onPress={() => setTooltipModal({ visible: false, type: null })}
+        >
+          <View style={styles.tooltipModalContent}>
+            <Text style={styles.tooltipTitle}>
+              {tooltipModal.type === 'money' && '💰 KASA'}
+              {tooltipModal.type === 'rides' && '👥 YOLCU'}
+              {tooltipModal.type === 'reputation' && '⭐ İTİBAR'}
+            </Text>
+            <Text style={styles.tooltipText}>
+              {tooltipModal.type === 'money' && 'Kasanızda biriken para miktarı. Yolcu taşıyarak ve hikayeleri tamamlayarak kazanabilirsiniz.'}
+              {tooltipModal.type === 'rides' && 'Toplam taşıdığınız yolcu sayısı. Her yolcu bir hikaye ve farklı sonuçlar getirir.'}
+              {tooltipModal.type === 'reputation' && 'İtibar yüksekse bazı yolcular ekstra bahşiş bırakır. İtibarınızı iyi kararlar vererek artırabilirsiniz.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.tooltipCloseBtn}
+              onPress={() => setTooltipModal({ visible: false, type: null })}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tooltipCloseText}>Tamam</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </Animated.View >
   );
 
   // YOLCU EKRANI - TAM EKRAN PORTRE
@@ -827,19 +1578,46 @@ function GameScreen() {
 
         {/* Karakter Küçük Portre */}
         <View style={styles.dialogueCharacterRow}>
-          {p.image ? (
-            <Image source={p.image} style={styles.dialogueCharacterSmall} resizeMode="cover" />
-          ) : (
-            <Text style={styles.dialogueAvatarSmall}>{p.avatar}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {p.image ? (
+              <Image source={p.image} style={styles.dialogueCharacterSmall} resizeMode="cover" />
+            ) : (
+              <Text style={styles.dialogueAvatarSmall}>{p.avatar}</Text>
+            )}
+            <Text style={styles.dialogueCharacterName}>{p.name}</Text>
+          </View>
+
+          {/* Geçmiş Butonu - Buraya Taşındı */}
+          {dialogueHistory.length > 0 && (
+            <TouchableOpacity
+              style={styles.historyBtn}
+              onPress={() => setShowHistoryModal(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.historyBtnText}>📜 Geçmiş</Text>
+            </TouchableOpacity>
           )}
-          <Text style={styles.dialogueCharacterName}>{p.name}</Text>
         </View>
 
         {/* Diyalog Kutusu */}
-        <View style={styles.dialogueBox}>
-          <ScrollView style={styles.dialogueScroll} showsVerticalScrollIndicator={false}>
-            <Text style={styles.dialogueTextNew}>
-              {isThinking ? "..." : (dialogue?.text || "...")}
+        <View style={[styles.dialogueBox, getDialogueBoxStyle()]}>
+          <ScrollView
+            style={styles.dialogueScroll}
+            showsVerticalScrollIndicator={false}
+            onTouchStart={canSkipTyping && isTyping ? skipTypewriter : undefined}
+          >
+            <Text style={[
+              styles.dialogueTextNew,
+              {
+                fontSize: normalizeFont(16 * fontSizeMultiplier),
+                lineHeight: normalizeFont(28 * fontSizeMultiplier),
+                color: getTextColor(),
+              }
+            ]}>
+              {isThinking ? "..." : (isTyping && displayedText ? displayedText : (dialogue?.text || "..."))}
+              {isTyping && canSkipTyping && (
+                <Text style={[styles.skipHint, { fontSize: normalizeFont(12 * fontSizeMultiplier) }]}> (Dokunarak hızlandır)</Text>
+              )}
             </Text>
           </ScrollView>
         </View>
@@ -852,24 +1630,42 @@ function GameScreen() {
             </View>
           ) : (
             <>
-              {dialogue?.choices?.map((choice, index) => (
-                <Animated.View
-                  key={index}
-                  style={{
-                    opacity: choicesAnim,
-                    transform: [{
-                      translateY: choicesAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [20, 0]
-                      })
-                    }]
-                  }}
-                >
-                  <TouchableOpacity style={styles.choiceBtnNew} onPress={() => handleChoice(choice.next, choice.ending)} activeOpacity={0.8}>
-                    <Text style={styles.choiceTextNew}>{choice.text}</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              ))}
+              {dialogue?.choices?.map((choice, index) => {
+                // Seçenek ipuçlarını analiz et
+                const hints = analyzeChoiceHints(choice, dialogue);
+
+                return (
+                  <Animated.View
+                    key={index}
+                    style={{
+                      opacity: choicesAnim,
+                      transform: [{
+                        translateY: choicesAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [20, 0]
+                        })
+                      }]
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={styles.choiceBtnPlayer}
+                      onPress={() => handleChoice(choice.next, choice.ending)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.choiceContent}>
+                        <Text style={styles.choiceTextPlayer}>{choice.text}</Text>
+                        {hints.length > 0 && (
+                          <View style={styles.choiceHints}>
+                            {hints.map((hint, idx) => (
+                              <Text key={idx} style={styles.choiceHintIcon}>{hint}</Text>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
 
               {dialogue?.ending && (
                 <Animated.View
@@ -891,8 +1687,85 @@ function GameScreen() {
             </>
           )}
         </View>
+
+        {/* Geçmiş Modal */}
+        <Modal
+          visible={showHistoryModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowHistoryModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.historyModalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowHistoryModal(false)}
+          >
+            <TouchableWithoutFeedback onPress={() => { }}>
+              <View style={styles.historyModalContent}>
+                <View style={styles.historyModalHeader}>
+                  <Text style={styles.historyModalTitle}>📜 Diyalog Geçmişi</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowHistoryModal(false)}
+                    style={styles.historyModalCloseBtn}
+                  >
+                    <Text style={styles.historyModalCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.historyScroll} showsVerticalScrollIndicator={false}>
+                  <View onStartShouldSetResponder={() => true}>
+                    {dialogueHistory.map((item, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.historyItem,
+                          item.type === 'player' && styles.historyItemPlayer
+                        ]}
+                      >
+                        <Text style={styles.historySpeaker}>{item.speaker}:</Text>
+                        <Text style={[
+                          styles.historyText,
+                          item.type === 'player' && styles.historyTextPlayer
+                        ]}>
+                          {item.text}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </TouchableOpacity>
+        </Modal>
       </Animated.View>
     );
+  };
+
+  // Seçenek ipuçlarını analiz et
+  const analyzeChoiceHints = (choice, dialogue) => {
+    const hints = [];
+    const text = choice.text.toLowerCase();
+
+    // Para ipuçları
+    if (text.includes('para') || text.includes('ücret') || text.includes('ödeme') || text.includes('bahşiş')) {
+      hints.push('💸');
+    }
+
+    // İtibar ipuçları
+    if (text.includes('kaba') || text.includes('kırgın') || text.includes('üzgün') || text.includes('kızgın')) {
+      hints.push('💔');
+    }
+
+    // Riskli karar ipuçları
+    if (text.includes('risk') || text.includes('tehlikeli') || text.includes('polis') || text.includes('kaç') || text.includes('yasa dışı')) {
+      hints.push('⚖️');
+    }
+
+    // İyi karar ipuçları
+    if (text.includes('yardım') || text.includes('iyilik') || text.includes('şefkat') || text.includes('merhamet')) {
+      hints.push('✨');
+    }
+
+    return hints;
   };
 
   // BİTİŞ EKRANI
@@ -950,6 +1823,38 @@ function GameScreen() {
               {bonus > 0 && <Text style={styles.bonusApplied}>+{bonus}% Ekipman Bonusu</Text>}
             </View>
 
+            {/* Günlük Görev İlerlemesi */}
+            <View style={styles.dailyQuestsProgressCard}>
+              <Text style={styles.dailyQuestsProgressTitle}>📋 GÜNLÜK GÖREV İLERLEMESİ</Text>
+              <View style={styles.questProgressItem}>
+                <Text style={styles.questProgressText}>
+                  {dailyQuests.ridesToday >= 5 ? '✅' : '⭕'} Bugün 5 yolcu taşı
+                </Text>
+                <View style={styles.questProgressBar}>
+                  <View style={[styles.questProgressFill, { width: `${Math.min(100, (dailyQuests.ridesToday / 5) * 100)}%` }]} />
+                </View>
+                <Text style={styles.questProgressCount}>{dailyQuests.ridesToday}/5</Text>
+              </View>
+              <View style={styles.questProgressItem}>
+                <Text style={styles.questProgressText}>
+                  {dailyQuests.nightRides >= 3 ? '✅' : '⭕'} Gece 3 yolculuk yap
+                </Text>
+                <View style={styles.questProgressBar}>
+                  <View style={[styles.questProgressFill, { width: `${Math.min(100, (dailyQuests.nightRides / 3) * 100)}%` }]} />
+                </View>
+                <Text style={styles.questProgressCount}>{dailyQuests.nightRides}/3</Text>
+              </View>
+              <View style={styles.questProgressItem}>
+                <Text style={styles.questProgressText}>
+                  {dailyQuests.policeFreeRides >= 10 ? '✅' : '⭕'} Polissiz 10 sefer
+                </Text>
+                <View style={styles.questProgressBar}>
+                  <View style={[styles.questProgressFill, { width: `${Math.min(100, (dailyQuests.policeFreeRides / 10) * 100)}%` }]} />
+                </View>
+                <Text style={styles.questProgressCount}>{dailyQuests.policeFreeRides}/10</Text>
+              </View>
+            </View>
+
             <TouchableOpacity style={[styles.continueBtn, { backgroundColor: endingColor }]} onPress={continueGame} activeOpacity={0.8}>
               <Text style={[styles.continueBtnText, { color: '#000' }]}>
                 {currentEnding.type === 'normal' ? 'DEVAM ET' : 'YENİ HİKAYE'}
@@ -966,8 +1871,17 @@ function GameScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <DrivingGame
-          onComplete={handleMiniGameResult}
+          onComplete={(success) => {
+            if (!success) {
+              triggerAccident(settings.vibrationEnabled);
+            }
+            handleMiniGameResult(success);
+          }}
           difficulty={gameState.currentPassenger?.id === 20 ? 'hard' : 'normal'}
+          dayTime={manager.dayTime}
+          passengerName={gameState.currentPassenger?.name || ''}
+          effectVolume={settings.effectVolume ?? 0.7}
+          vibrationEnabled={settings.vibrationEnabled ?? true}
         />
       </View>
     );
@@ -984,6 +1898,7 @@ function GameScreen() {
           dayTime={manager.dayTime}
           hour={manager.hour}
           lastTaxiLocation={lastLocation} // Son konumu geçiriyoruz
+          onTaximeterIncrease={handleTaximeterIncrease}
         />
       </View>
     );
@@ -1046,6 +1961,97 @@ function GameScreen() {
     );
   }
 
+  // AYARLAR EKRANI
+  if (screen === 'settings') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <SettingsScreen
+          onClose={() => setScreen('menu')}
+          onSettingsChange={(newSettings) => {
+            setSettings(newSettings);
+            // Ses seviyelerini güncelle
+            if (rainSound) rainSound.setVolumeAsync(newSettings.musicVolume * 0.3);
+            if (trafficSound) trafficSound.setVolumeAsync(newSettings.effectVolume * 0.15);
+            if (citySound) citySound.setVolumeAsync(newSettings.effectVolume * 0.12);
+          }}
+        />
+      </View>
+    );
+  }
+
+  // BAŞARILAR EKRANI
+  if (screen === 'achievements') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: COLORS.bg }]}>
+        <View style={styles.screen}>
+          {/* Header */}
+          <View style={styles.achievementsHeader}>
+            <TouchableOpacity
+              style={styles.achievementsBackBtn}
+              onPress={() => setScreen('menu')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.achievementsBackText}>← GERİ</Text>
+            </TouchableOpacity>
+            <Text style={styles.achievementsHeaderTitle}>🏆 BAŞARILAR</Text>
+            <View style={{ width: normalize(60) }} />
+          </View>
+
+          {/* Liste */}
+          <ScrollView
+            style={styles.achievementsScroll}
+            contentContainerStyle={styles.achievementsContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {ACHIEVEMENTS.map(achievement => {
+              const isUnlocked = achievements[achievement.id]?.unlocked;
+              return (
+                <View
+                  key={achievement.id}
+                  style={[
+                    styles.achievementCard,
+                    isUnlocked ? styles.achievementCardUnlocked : styles.achievementCardLocked,
+                  ]}
+                >
+                  <View style={styles.achievementCardLeft}>
+                    <Text style={[styles.achievementCardEmoji, !isUnlocked && styles.achievementCardEmojiLocked]}>
+                      {isUnlocked ? achievement.emoji : '🔒'}
+                    </Text>
+                  </View>
+                  <View style={styles.achievementCardRight}>
+                    <Text style={[styles.achievementCardName, !isUnlocked && styles.achievementCardNameLocked]}>
+                      {achievement.name}
+                    </Text>
+                    <Text style={[styles.achievementCardDesc, !isUnlocked && styles.achievementCardDescLocked]}>
+                      {achievement.description}
+                    </Text>
+                    {isUnlocked && achievements[achievement.id]?.unlockedAt && (
+                      <Text style={styles.achievementCardDate}>
+                        {new Date(achievements[achievement.id].unlockedAt).toLocaleDateString('tr-TR')}
+                      </Text>
+                    )}
+                  </View>
+                  {isUnlocked && (
+                    <View style={styles.achievementCheckmark}>
+                      <Text style={styles.achievementCheckmarkText}>✓</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={styles.achievementsFooter}>
+            <Text style={styles.achievementsFooterText}>
+              {Object.keys(achievements).filter(id => achievements[id]?.unlocked).length} / {ACHIEVEMENTS.length} Başarı Kazanıldı
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.bgGradient} />
@@ -1071,11 +2077,17 @@ const styles = StyleSheet.create({
   logoText: { fontSize: normalize(42), fontWeight: '700', color: COLORS.accent, letterSpacing: normalize(6) },
   logoSubtext: { fontSize: normalize(11), color: COLORS.textDim, letterSpacing: normalize(4), marginTop: normalize(6) },
 
-  // Mute Butonu
-  muteBtn: {
+  // Üst Butonlar Row
+  topButtonsRow: {
     position: 'absolute',
     top: normalize(16),
     right: normalize(16),
+    flexDirection: 'row',
+    gap: normalize(10),
+    zIndex: 10,
+  },
+  // Ayarlar Butonu
+  settingsBtn: {
     width: normalize(44),
     height: normalize(44),
     borderRadius: normalize(22),
@@ -1084,10 +2096,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.cardLight,
-    zIndex: 10,
   },
-  muteBtnText: {
+  settingsBtnText: {
     fontSize: normalize(22),
+  },
+  // Sıfırlama Butonu (Kırmızı Çerçeve)
+  resetBtn: {
+    width: normalize(44),
+    height: normalize(44),
+    borderRadius: normalize(22),
+    backgroundColor: 'rgba(255, 107, 107, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.danger,
+  },
+  resetBtnText: {
+    fontSize: normalize(20),
   },
 
   // YENİ: Zaman Bar
@@ -1103,19 +2128,247 @@ const styles = StyleSheet.create({
   timeItem: { alignItems: 'center' },
   timeEmoji: { fontSize: normalize(18), marginBottom: normalize(2) },
   timeText: { fontSize: normalize(12), color: COLORS.text, fontWeight: '600' },
+  timeLabel: { fontSize: normalize(9), color: COLORS.textDim, marginTop: normalize(2), textTransform: 'uppercase', letterSpacing: 0.5 },
   timeDanger: { color: COLORS.danger },
 
   statsContainer: { flexDirection: 'row', backgroundColor: COLORS.card, borderRadius: normalize(16), padding: normalize(18), marginBottom: normalize(12), width: '100%' },
   statBox: { flex: 1, alignItems: 'center' },
+  statHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: normalize(4) },
   statValue: { fontSize: normalize(20), fontWeight: '700', color: COLORS.text },
   statLabel: { fontSize: normalize(9), color: COLORS.textDim, marginTop: normalize(4), letterSpacing: 1 },
+  statInfoBtn: { padding: normalize(4) },
+  statInfoText: { fontSize: normalize(12), color: COLORS.textDim, opacity: 0.7 },
+  nextRankText: { fontSize: normalize(8), color: COLORS.textDim, marginTop: normalize(2), fontStyle: 'italic' },
   statDivider: { width: 1, backgroundColor: COLORS.cardLight, marginHorizontal: normalize(8) },
+  reputationProgressContainer: { width: '100%', marginTop: normalize(6) },
+  reputationProgressBar: { height: normalize(4), backgroundColor: COLORS.cardLight, borderRadius: normalize(2), overflow: 'hidden', marginBottom: normalize(4) },
+  reputationProgressFill: { height: '100%', borderRadius: normalize(2) },
+  reputationProgressText: { fontSize: normalize(7), color: COLORS.textDim, textAlign: 'center', fontStyle: 'italic' },
   bonusBadge: { backgroundColor: COLORS.success, paddingHorizontal: normalize(16), paddingVertical: normalize(6), borderRadius: normalize(20), marginBottom: normalize(8) },
   bonusText: { color: COLORS.bg, fontWeight: 'bold', fontSize: normalize(12) },
+
+  // Günlük Görevler
+  dailyQuestsContainer: {
+    backgroundColor: COLORS.card,
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    marginBottom: normalize(12),
+    width: '100%',
+  },
+  dailyQuestsTitle: {
+    fontSize: normalize(11),
+    color: COLORS.accent,
+    fontWeight: '700',
+    marginBottom: normalize(8),
+    letterSpacing: 1,
+  },
+  questItem: {
+    marginBottom: normalize(6),
+  },
+  questText: {
+    fontSize: normalize(11),
+    color: COLORS.text,
+    lineHeight: normalize(16),
+  },
+  // Başarılar Rozet Satırı Stilleri
+  achievementsRow: {
+    backgroundColor: COLORS.card,
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    marginBottom: normalize(12),
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.cardLight,
+  },
+  achievementsRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: normalize(10),
+  },
+  achievementsTitle: {
+    fontSize: normalize(12),
+    color: COLORS.accent,
+    fontWeight: '700',
+  },
+  achievementsCount: {
+    fontSize: normalize(11),
+    color: COLORS.textDim,
+    fontWeight: '600',
+  },
+  achievementBadgesRow: {
+    flexDirection: 'row',
+    gap: normalize(8),
+    marginBottom: normalize(8),
+  },
+  achievementBadge: {
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
+    backgroundColor: COLORS.cardLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  achievementEmoji: {
+    fontSize: normalize(18),
+  },
+  achievementMoreBadge: {
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
+    backgroundColor: COLORS.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  achievementMoreText: {
+    fontSize: normalize(12),
+    color: COLORS.bg,
+    fontWeight: '700',
+  },
+  achievementsHint: {
+    fontSize: normalize(10),
+    color: COLORS.textDim,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  // Başarılar EKRANI stilleri (sayfa)
+  achievementsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: normalize(20),
+    paddingBottom: normalize(16),
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardLight,
+  },
+  achievementsBackBtn: {
+    paddingVertical: normalize(8),
+    paddingHorizontal: normalize(12),
+  },
+  achievementsBackText: {
+    fontSize: normalize(14),
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  achievementsHeaderTitle: {
+    fontSize: normalize(20),
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  achievementsScroll: {
+    flex: 1,
+  },
+  achievementsContent: {
+    paddingBottom: normalize(20),
+  },
+  achievementCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: normalize(16),
+    borderRadius: normalize(12),
+    marginBottom: normalize(12),
+    borderWidth: 1,
+  },
+  achievementCardUnlocked: {
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.accent,
+  },
+  achievementCardLocked: {
+    backgroundColor: 'rgba(26, 26, 36, 0.5)',
+    borderColor: COLORS.cardLight,
+  },
+  achievementCardLeft: {
+    marginRight: normalize(16),
+  },
+  achievementCardEmoji: {
+    fontSize: normalize(32),
+  },
+  achievementCardEmojiLocked: {
+    opacity: 0.5,
+  },
+  achievementCardRight: {
+    flex: 1,
+  },
+  achievementCardName: {
+    fontSize: normalize(16),
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: normalize(4),
+  },
+  achievementCardNameLocked: {
+    color: COLORS.textDim,
+  },
+  achievementCardDesc: {
+    fontSize: normalize(12),
+    color: COLORS.textDim,
+    lineHeight: normalize(18),
+  },
+  achievementCardDescLocked: {
+    opacity: 0.7,
+  },
+  achievementCardDate: {
+    fontSize: normalize(10),
+    color: COLORS.accent,
+    marginTop: normalize(6),
+    fontStyle: 'italic',
+  },
+  achievementCheckmark: {
+    width: normalize(28),
+    height: normalize(28),
+    borderRadius: normalize(14),
+    backgroundColor: COLORS.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: normalize(12),
+  },
+  achievementCheckmarkText: {
+    fontSize: normalize(16),
+    color: COLORS.bg,
+    fontWeight: '700',
+  },
+  achievementsFooter: {
+    paddingVertical: normalize(16),
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardLight,
+  },
+  achievementsFooterText: {
+    fontSize: normalize(14),
+    color: COLORS.textDim,
+    fontWeight: '600',
+  },
   storyCounter: { color: COLORS.accent, fontSize: normalize(13), marginBottom: normalize(12), fontWeight: '600' },
   startBtn: { backgroundColor: COLORS.accent, paddingVertical: normalize(18), paddingHorizontal: normalize(40), borderRadius: normalize(14), width: '100%', alignItems: 'center', marginBottom: normalize(16) },
   startBtnText: { fontSize: normalize(16), fontWeight: '700', color: COLORS.bg, letterSpacing: 1 },
   startBtnSub: { fontSize: normalize(10), color: COLORS.bg, opacity: 0.7, marginTop: normalize(4) },
+  // CTA Button with Gradient and Glow
+  ctaButtonContainer: { width: '100%', marginBottom: normalize(16), position: 'relative' },
+  ctaGlow: {
+    position: 'absolute',
+    top: normalize(-4),
+    left: normalize(-4),
+    right: normalize(-4),
+    bottom: normalize(-4),
+    borderRadius: normalize(18),
+    backgroundColor: COLORS.accent,
+    opacity: 0.3,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: normalize(15),
+    elevation: 10,
+  },
+  ctaButton: { borderRadius: normalize(14), overflow: 'hidden', width: '100%' },
+  ctaGradient: { paddingVertical: normalize(20), paddingHorizontal: normalize(40), alignItems: 'center', borderRadius: normalize(14) },
+  ctaButtonText: { fontSize: normalize(18), fontWeight: '700', color: COLORS.bg, letterSpacing: 1, marginBottom: normalize(4) },
+  ctaButtonSub: { fontSize: normalize(11), color: COLORS.bg, opacity: 0.9, fontWeight: '500' },
+  // Tooltip Modal
+  tooltipModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: normalize(24) },
+  tooltipModalContent: { backgroundColor: COLORS.card, borderRadius: normalize(16), padding: normalize(24), width: '100%', maxWidth: normalize(320), borderWidth: 1, borderColor: COLORS.cardLight },
+  tooltipTitle: { fontSize: normalize(18), fontWeight: '700', color: COLORS.accent, marginBottom: normalize(12), textAlign: 'center' },
+  tooltipText: { fontSize: normalize(14), color: COLORS.text, lineHeight: normalize(22), textAlign: 'center', marginBottom: normalize(20) },
+  tooltipCloseBtn: { backgroundColor: COLORS.accent, paddingVertical: normalize(12), borderRadius: normalize(8), alignItems: 'center' },
+  tooltipCloseText: { fontSize: normalize(14), fontWeight: '700', color: COLORS.bg, letterSpacing: 1 },
 
   // Alt butonlar
   bottomButtons: { flexDirection: 'row', gap: normalize(12), marginBottom: normalize(16) },
@@ -1145,19 +2398,132 @@ const styles = StyleSheet.create({
   dialogueScreenFull: { padding: 0 },
   dialoguePortraitBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   dialoguePortraitImage: { width: '100%', height: '100%', opacity: 0.3 },
-  dialoguePortraitOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,15,0.7)' },
-  dialogueTopBar: { paddingHorizontal: normalize(16), paddingTop: normalize(16) },
   dialogueCharacterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: normalize(20), paddingVertical: normalize(12) },
   dialogueCharacterSmall: { width: normalize(50), height: normalize(50), borderRadius: normalize(25), borderWidth: 2, borderColor: COLORS.accent, marginRight: normalize(12) },
   dialogueAvatarSmall: { fontSize: normalize(36), marginRight: normalize(12) },
   dialogueCharacterName: { fontSize: normalize(18), fontWeight: '600', color: COLORS.text },
-  dialogueBox: { flex: 1, marginHorizontal: normalize(16), marginBottom: normalize(12), backgroundColor: 'rgba(26,26,36,0.9)', borderRadius: normalize(16), padding: normalize(20) },
+  dialogueBox: { flex: 1, marginHorizontal: normalize(16), marginBottom: normalize(12), backgroundColor: 'rgba(26,26,36,0.9)', borderRadius: normalize(16), padding: normalize(20), position: 'relative' },
   dialogueScroll: { flex: 1 },
   dialogueTextNew: { fontSize: normalize(16), lineHeight: normalize(28), color: COLORS.text },
+  skipHint: { fontSize: normalize(12), color: COLORS.textDim, fontStyle: 'italic' },
+  // Geçmiş Butonu
+  historyBtn: {
+    position: 'absolute',
+    top: normalize(8),
+    right: normalize(8),
+    backgroundColor: 'rgba(255, 200, 87, 0.2)',
+    paddingHorizontal: normalize(12),
+    paddingVertical: normalize(6),
+    borderRadius: normalize(12),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 200, 87, 0.3)',
+    zIndex: 10,
+  },
+  historyBtnText: {
+    fontSize: normalize(11),
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
   choicesContainerNew: { paddingHorizontal: normalize(16), paddingBottom: normalize(24), gap: normalize(10) },
   choiceBtnNew: { backgroundColor: COLORS.cardLight, borderRadius: normalize(12), padding: normalize(16), borderWidth: 1, borderColor: COLORS.card },
   choiceTextNew: { fontSize: normalize(14), color: COLORS.text, lineHeight: normalize(20) },
+  // Oyuncu Seçenek Butonu (Farklı Renk)
+  choiceBtnPlayer: {
+    backgroundColor: COLORS.accent,
+    borderRadius: normalize(12),
+    padding: normalize(16),
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    opacity: 0.9,
+  },
+  choiceContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  choiceTextPlayer: { fontSize: normalize(14), color: COLORS.bg, lineHeight: normalize(20), fontWeight: '600', flex: 1 },
+  choiceHints: {
+    flexDirection: 'row',
+    gap: normalize(4),
+    marginLeft: normalize(8),
+  },
+  choiceHintIcon: {
+    fontSize: normalize(16),
+  },
   endingBtn: { backgroundColor: COLORS.success, borderColor: COLORS.success },
+  // Geçmiş Modal
+  historyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: normalize(24),
+  },
+  historyModalContent: {
+    backgroundColor: COLORS.card,
+    borderRadius: normalize(16),
+    padding: normalize(20),
+    width: '100%',
+    maxWidth: normalize(400),
+    maxHeight: '80%', // Yüzdelik yükseklik
+    borderWidth: 1,
+    borderColor: COLORS.cardLight,
+  },
+  historyModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: normalize(16),
+    paddingBottom: normalize(12),
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardLight,
+  },
+  historyModalTitle: {
+    fontSize: normalize(18),
+    fontWeight: '700',
+    color: COLORS.accent,
+  },
+  historyModalCloseBtn: {
+    width: normalize(32),
+    height: normalize(32),
+    borderRadius: normalize(16),
+    backgroundColor: COLORS.cardLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  historyModalCloseText: {
+    fontSize: normalize(18),
+    color: COLORS.textDim,
+  },
+  historyScroll: {
+    // maxHeight kaldırıldı, parent (modalContent) yüksekliğine uyacak
+  },
+  historyItem: {
+    marginBottom: normalize(16),
+    padding: normalize(12),
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: normalize(10),
+  },
+  historyItemPlayer: {
+    backgroundColor: 'rgba(255, 200, 87, 0.15)',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.accent,
+  },
+  historySpeaker: {
+    fontSize: normalize(12),
+    fontWeight: '700',
+    color: COLORS.accent,
+    marginBottom: normalize(4),
+  },
+  historyText: {
+    fontSize: normalize(14),
+    color: COLORS.text,
+    lineHeight: normalize(20),
+  },
+  historyTextPlayer: {
+    color: COLORS.bg,
+    fontWeight: '500',
+  },
   thinkingContainer: { padding: normalize(20), alignItems: 'center', justifyContent: 'center' },
   thinkingText: { color: COLORS.textDim, fontSize: normalize(24), fontWeight: 'bold', letterSpacing: 2 },
 
@@ -1174,6 +2540,213 @@ const styles = StyleSheet.create({
   endingStatValue: { fontSize: normalize(36), fontWeight: '700', color: COLORS.accent, marginBottom: normalize(4) },
   endingStatLabel: { fontSize: normalize(10), color: COLORS.textDim, letterSpacing: 1 },
   bonusApplied: { color: COLORS.success, fontSize: normalize(12), marginBottom: normalize(24), fontWeight: '600', textAlign: 'center' },
+
+  // Ending Ekranı Günlük Görevler
+  dailyQuestsProgressCard: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: normalize(12),
+    padding: normalize(16),
+    width: '100%',
+    marginBottom: normalize(20),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  dailyQuestsProgressTitle: {
+    color: COLORS.accent,
+    fontSize: normalize(11),
+    fontWeight: '700',
+    marginBottom: normalize(12),
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  questProgressItem: {
+    marginBottom: normalize(12),
+  },
+  questProgressText: {
+    fontSize: normalize(11),
+    color: COLORS.text,
+    marginBottom: normalize(4),
+  },
+  questProgressBar: {
+    height: normalize(6),
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: normalize(3),
+    overflow: 'hidden',
+    marginBottom: normalize(4),
+  },
+  questProgressFill: {
+    height: '100%',
+    backgroundColor: COLORS.success,
+    borderRadius: normalize(3),
+  },
+  questProgressCount: {
+    fontSize: normalize(9),
+    color: COLORS.textDim,
+    textAlign: 'right',
+  },
+
+  // Başarılar Rozet Satırı
+  achievementsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: normalize(12),
+    gap: normalize(8),
+  },
+  achievementBadge: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: COLORS.cardLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+  },
+  achievementEmoji: {
+    fontSize: normalize(20),
+  },
+  achievementMoreBadge: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.cardLight,
+  },
+  achievementMoreText: {
+    fontSize: normalize(10),
+    color: COLORS.textDim,
+    fontWeight: '700',
+  },
+  achievementViewAllBtn: {
+    paddingHorizontal: normalize(12),
+    paddingVertical: normalize(6),
+    borderRadius: normalize(12),
+    backgroundColor: COLORS.cardLight,
+    borderWidth: 1,
+    borderColor: COLORS.card,
+  },
+  achievementViewAllText: {
+    fontSize: normalize(10),
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+
+  // Başarılar Detay Ekranı
+  achievementsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: normalize(16),
+    marginBottom: normalize(16),
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardLight,
+  },
+  achievementsBackBtn: {
+    paddingVertical: normalize(8),
+    paddingHorizontal: normalize(12),
+  },
+  achievementsBackText: {
+    fontSize: normalize(14),
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  achievementsHeaderTitle: {
+    fontSize: normalize(20),
+    fontWeight: '700',
+    color: COLORS.text,
+    letterSpacing: 1,
+  },
+  achievementsScroll: {
+    flex: 1,
+  },
+  achievementsContent: {
+    paddingBottom: normalize(20),
+  },
+  achievementCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.card,
+    borderRadius: normalize(12),
+    padding: normalize(16),
+    marginBottom: normalize(12),
+    borderWidth: 1,
+    borderColor: COLORS.cardLight,
+    position: 'relative',
+  },
+  achievementCardUnlocked: {
+    borderColor: COLORS.accent,
+    borderWidth: 2,
+  },
+  achievementCardLocked: {
+    opacity: 0.5,
+  },
+  achievementCardLeft: {
+    marginRight: normalize(12),
+  },
+  achievementCardEmoji: {
+    fontSize: normalize(32),
+  },
+  achievementCardEmojiLocked: {
+    opacity: 0.3,
+  },
+  achievementCardRight: {
+    flex: 1,
+  },
+  achievementCardName: {
+    fontSize: normalize(16),
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: normalize(4),
+  },
+  achievementCardNameLocked: {
+    color: COLORS.textDim,
+  },
+  achievementCardDesc: {
+    fontSize: normalize(12),
+    color: COLORS.textDim,
+    lineHeight: normalize(18),
+    marginBottom: normalize(4),
+  },
+  achievementCardDescLocked: {
+    color: COLORS.textDim,
+    opacity: 0.7,
+  },
+  achievementCardDate: {
+    fontSize: normalize(10),
+    color: COLORS.accent,
+    marginTop: normalize(4),
+  },
+  achievementCheckmark: {
+    position: 'absolute',
+    top: normalize(8),
+    right: normalize(8),
+    width: normalize(24),
+    height: normalize(24),
+    borderRadius: normalize(12),
+    backgroundColor: COLORS.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  achievementCheckmarkText: {
+    fontSize: normalize(14),
+    color: COLORS.bg,
+    fontWeight: '700',
+  },
+  achievementsFooter: {
+    paddingTop: normalize(16),
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardLight,
+    alignItems: 'center',
+  },
+  achievementsFooterText: {
+    fontSize: normalize(12),
+    color: COLORS.textDim,
+    fontWeight: '600',
+  },
+
   continueBtn: { backgroundColor: COLORS.accent, paddingVertical: normalize(16), paddingHorizontal: normalize(40), borderRadius: normalize(12) },
   continueBtnText: { fontSize: normalize(14), fontWeight: '700', color: COLORS.bg, letterSpacing: 1 },
 });

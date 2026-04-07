@@ -9,7 +9,7 @@ try {
 
     // 1. signingConfigs bloğunu güncelle
     // Mevcut debug bloğunun yanına release bloğunu ekle
-    if (!content.includes("keyAlias 'taksici-key'")) {
+    if (!content.includes("keyAlias System.getenv('TAKSICI_UPLOAD_KEY_ALIAS') ?: 'taksici-key'")) {
         console.log("Adding release signing config...");
         const signingRegex = /(signingConfigs\s*\{\s*debug\s*\{[\s\S]*?\}\s*\})/;
         const releaseConfig = `
@@ -21,10 +21,10 @@ try {
             keyPassword 'android'
         }
         release {
-            storeFile file('taksici-release.keystore')
-            storePassword 'Taksici2024Istanbul!'
-            keyAlias 'taksici-key'
-            keyPassword 'Taksici2024Istanbul!'
+            storeFile file(System.getenv('TAKSICI_UPLOAD_STORE_FILE') ?: 'taksici-release.keystore')
+            storePassword System.getenv('TAKSICI_UPLOAD_STORE_PASSWORD') ?: ''
+            keyAlias System.getenv('TAKSICI_UPLOAD_KEY_ALIAS') ?: 'taksici-key'
+            keyPassword System.getenv('TAKSICI_UPLOAD_KEY_PASSWORD') ?: ''
         }
     }`;
 

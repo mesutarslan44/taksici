@@ -11,14 +11,14 @@ try {
     const debugBlockEndRegex = /(signingConfigs\s*\{[\s\S]*?debug\s*\{[\s\S]*?\}\s*)/;
     const releaseConfig = `
         release {
-            storeFile file('taksici-release.keystore')
-            storePassword 'Taksici2024Istanbul!'
-            keyAlias 'taksici-key'
-            keyPassword 'Taksici2024Istanbul!'
+            storeFile file(System.getenv('TAKSICI_UPLOAD_STORE_FILE') ?: 'taksici-release.keystore')
+            storePassword System.getenv('TAKSICI_UPLOAD_STORE_PASSWORD') ?: ''
+            keyAlias System.getenv('TAKSICI_UPLOAD_KEY_ALIAS') ?: 'taksici-key'
+            keyPassword System.getenv('TAKSICI_UPLOAD_KEY_PASSWORD') ?: ''
         }
     `;
 
-    if (!content.includes("keyAlias 'taksici-key'")) {
+    if (!content.includes("keyAlias System.getenv('TAKSICI_UPLOAD_KEY_ALIAS') ?: 'taksici-key'")) {
         if (debugBlockEndRegex.test(content)) {
             content = content.replace(debugBlockEndRegex, '$1' + releaseConfig);
             console.log("Added release signing config.");
