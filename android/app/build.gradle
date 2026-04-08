@@ -12,6 +12,26 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def resolveStoreFile = { String rawPath ->
+    if (!rawPath) {
+        return null
+    }
+
+    File asFile = new File(rawPath)
+    if (asFile.isAbsolute()) {
+        return asFile
+    }
+
+    // First try android-root relative path (e.g. app/taksici-release.keystore)
+    File rootRelative = rootProject.file(rawPath)
+    if (rootRelative.exists()) {
+        return rootRelative
+    }
+
+    // Fallback to app-module relative path
+    return file(rawPath)
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -118,9 +138,10 @@ android {
             def storePasswordValue = keystoreProperties['storePassword'] ?: System.getenv('TAKSICI_UPLOAD_STORE_PASSWORD')
             def keyAliasValue = keystoreProperties['keyAlias'] ?: System.getenv('TAKSICI_UPLOAD_KEY_ALIAS')
             def keyPasswordValue = keystoreProperties['keyPassword'] ?: System.getenv('TAKSICI_UPLOAD_KEY_PASSWORD')
+            def resolvedStoreFile = resolveStoreFile(storeFilePath)
 
-            if (storeFilePath && storePasswordValue && keyAliasValue && keyPasswordValue) {
-                storeFile file(storeFilePath)
+            if (resolvedStoreFile && storePasswordValue && keyAliasValue && keyPasswordValue) {
+                storeFile resolvedStoreFile
                 storePassword storePasswordValue
                 keyAlias keyAliasValue
                 keyPassword keyPasswordValue
