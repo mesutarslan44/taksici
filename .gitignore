@@ -28,3 +28,14 @@ build/
 .next/
 out/
 android/keystore.properties
+android/local.properties
+android/.gradle/
+android/.idea/
+android/app/.cxx/
+android/*_log.txt
+android/build_log.txt
+android/final_attempt_log.txt
+android/final_build_log.txt
+android/gradle_log.txt
+android/last_hope_log.txt
+android/missing_file_log.txt

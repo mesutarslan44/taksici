@@ -14,6 +14,24 @@ import DrivingGame from './DrivingGame';
 import { getTimeEmoji, getTimeLabel, formatHour } from './GameManager';
 import { SettingsScreen } from './SettingsScreen';
 import { triggerReputationChange, triggerAccident, triggerNewRank } from './haptics';
+import {
+  DEFAULT_DAILY_QUESTS,
+  DEFAULT_META_PROGRESS,
+  META_UPGRADES,
+  rolloverDailyQuests,
+  updateQuestsOnRide,
+  getCurrentChainStep,
+  getDailyChainProgress,
+  claimDailyChain,
+  getActiveWeeklyEvent,
+  applyWeeklyEventBonuses,
+  getUpgradeCost,
+  tryPurchaseUpgrade,
+  getMetaEffects,
+  pickReplayVariant,
+  applyReplayVariantToEnding,
+} from './progressionSystems';
+import { logBalanceEvent, getCurrentWeekSummary, getBalanceHint } from './analytics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -69,6 +87,7 @@ const DAILY_QUESTS_KEY = '@taksici_daily_quests';
 const LAST_QUEST_RESET_KEY = '@taksici_last_quest_reset';
 const ACHIEVEMENTS_KEY = '@taksici_achievements';
 const SETTINGS_KEY = '@taksici_settings';
+const META_PROGRESS_KEY = '@taksici_meta_progress';
 
 // Varsayılan ayarlar
 const DEFAULT_SETTINGS = {
@@ -315,11 +334,20 @@ function GameScreen() {
   });
 
   // Günlük Görevler State
-  const [dailyQuests, setDailyQuests] = useState({
-    ridesToday: 0,
-    nightRides: 0,
-    policeFreeRides: 0,
-    lastResetDay: null,
+  const [dailyQuests, setDailyQuests] = useState(DEFAULT_DAILY_QUESTS);
+  const [metaProgress, setMetaProgress] = useState(DEFAULT_META_PROGRESS);
+  const [weeklySummary, setWeeklySummary] = useState({
+    weekId: '',
+    totalEvents: 0,
+    ridesCompleted: 0,
+    moneyDelta: 0,
+    avgRideMoney: 0,
+    policeEndings: 0,
+    refuels: 0,
+    breaks: 0,
+    dailyClaims: 0,
+    upgrades: 0,
+    replayRides: 0,
   });
 
   // Başarılar (Achievements) State
@@ -370,12 +398,19 @@ function GameScreen() {
     ambientTimeoutsRef.current = [];
   };
 
+  const weeklyEvent = getActiveWeeklyEvent();
+  const currentChainStep = getCurrentChainStep(dailyQuests);
+  const chainProgress = getDailyChainProgress(dailyQuests);
+  const metaEffects = getMetaEffects(metaProgress);
+
   // Manager kaydet/yükle
   useEffect(() => {
     loadManagerState();
     loadDailyQuests();
+    loadMetaProgress();
     loadAchievements();
     loadSettings();
+    refreshWeeklySummary();
   }, []);
 
   // Ayarları yükle
@@ -417,37 +452,58 @@ function GameScreen() {
     } catch (e) { console.log('Manager save error:', e); }
   };
 
+  const loadMetaProgress = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(META_PROGRESS_KEY);
+      if (saved) {
+        setMetaProgress({ ...DEFAULT_META_PROGRESS, ...JSON.parse(saved) });
+      }
+    } catch (e) {
+      console.log('Meta progress load error:', e);
+    }
+  };
+
+  const saveMetaProgress = async (newMeta) => {
+    try {
+      await AsyncStorage.setItem(META_PROGRESS_KEY, JSON.stringify(newMeta));
+    } catch (e) {
+      console.log('Meta progress save error:', e);
+    }
+  };
+
+  const refreshWeeklySummary = async () => {
+    const summary = await getCurrentWeekSummary();
+    setWeeklySummary(summary);
+  };
+
   // Günlük Görevler Yükleme ve Sıfırlama
   const loadDailyQuests = async () => {
     try {
       const saved = await AsyncStorage.getItem(DAILY_QUESTS_KEY);
-      const lastReset = await AsyncStorage.getItem(LAST_QUEST_RESET_KEY);
-      const today = new Date().toDateString();
+      const legacyReset = await AsyncStorage.getItem(LAST_QUEST_RESET_KEY);
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const parsed = saved ? { ...DEFAULT_DAILY_QUESTS, ...JSON.parse(saved) } : { ...DEFAULT_DAILY_QUESTS };
 
-      if (saved && lastReset === today) {
-        setDailyQuests(JSON.parse(saved));
-      } else {
-        // Yeni gün, görevleri sıfırla
-        const newQuests = {
-          ridesToday: 0,
-          nightRides: 0,
-          policeFreeRides: 0,
-          lastResetDay: today,
-        };
-        setDailyQuests(newQuests);
-        await AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(newQuests));
-        await AsyncStorage.setItem(LAST_QUEST_RESET_KEY, today);
+      if (!parsed.lastResetDay && legacyReset) {
+        parsed.lastResetDay = legacyReset;
       }
+
+      const rolled = rolloverDailyQuests(parsed, todayKey);
+      setDailyQuests(rolled);
+      await AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(rolled));
+      await AsyncStorage.setItem(LAST_QUEST_RESET_KEY, todayKey);
     } catch (e) { console.log('Daily quests load error:', e); }
   };
 
   const saveDailyQuests = async (newQuests) => {
     try {
       await AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(newQuests));
+      if (newQuests?.lastResetDay) {
+        await AsyncStorage.setItem(LAST_QUEST_RESET_KEY, newQuests.lastResetDay);
+      }
     } catch (e) { console.log('Daily quests save error:', e); }
   };
 
-  // Başarılar Yükleme ve Kaydetme
   const loadAchievements = async () => {
     try {
       const saved = await AsyncStorage.getItem(ACHIEVEMENTS_KEY);
@@ -495,38 +551,73 @@ function GameScreen() {
   };
 
   const updateDailyQuests = (ending, hour = manager.hour) => {
-    const today = new Date().toDateString();
+    const todayKey = new Date().toISOString().slice(0, 10);
 
     setDailyQuests(prev => {
-      const newQuests = { ...prev };
-
-      // Eğer bugün değilse, görevleri sıfırla
-      if (prev.lastResetDay !== today) {
-        newQuests.ridesToday = 0;
-        newQuests.nightRides = 0;
-        newQuests.policeFreeRides = 0;
-        newQuests.lastResetDay = today;
-      }
-
-      // Bugün 5 yolcu taşı
-      newQuests.ridesToday = newQuests.ridesToday + 1;
-
-      // Gece 3 yolculuk yap (gece saatleri: 21-06 arası)
-      if (hour >= 21 || hour < 6) {
-        newQuests.nightRides = newQuests.nightRides + 1;
-      }
-
-      // Polissiz 10 sefer (ending type 'police' değilse)
-      if (!ending || ending.type !== 'police') {
-        newQuests.policeFreeRides = newQuests.policeFreeRides + 1;
-      }
-
-      saveDailyQuests(newQuests);
-      return newQuests;
+      const rolled = rolloverDailyQuests(prev, todayKey);
+      const next = updateQuestsOnRide(rolled, { ending, hour });
+      saveDailyQuests(next);
+      return next;
     });
   };
 
-  // Gün zamanı hesapla
+  const handleClaimDailyChainReward = () => {
+    setDailyQuests(prev => {
+      const rolled = rolloverDailyQuests(prev, new Date().toISOString().slice(0, 10));
+      const result = claimDailyChain(rolled);
+      if (!result.claimed) return rolled;
+
+      setGameState(prevState => {
+        const nextState = {
+          ...prevState,
+          money: prevState.money + result.reward.money,
+          reputation: prevState.reputation + result.reward.reputation,
+        };
+        saveGameState(nextState);
+        setTimeout(() => {
+          checkAchievements(null, nextState, completedStories);
+        }, 100);
+        return nextState;
+      });
+
+      logBalanceEvent('daily_chain_claim', {
+        chainDayIndex: rolled.chainDayIndex,
+        moneyReward: result.reward.money,
+        repReward: result.reward.reputation,
+      });
+
+      saveDailyQuests(result.updated);
+      refreshWeeklySummary();
+      return result.updated;
+    });
+  };
+
+  const handlePurchaseMetaUpgrade = (upgradeId) => {
+    const purchase = tryPurchaseUpgrade(metaProgress, upgradeId);
+    if (!purchase.ok) return;
+
+    if (gameState.money < purchase.cost) {
+      Alert.alert('Yetersiz Bakiye', 'Bu gelistirme icin kasada yeterli para yok.');
+      return;
+    }
+
+    const newMeta = purchase.newMeta;
+    const newState = { ...gameState, money: gameState.money - purchase.cost };
+
+    setMetaProgress(newMeta);
+    saveMetaProgress(newMeta);
+
+    setGameState(newState);
+    saveGameState(newState);
+
+    logBalanceEvent('meta_upgrade_buy', {
+      upgradeId,
+      cost: purchase.cost,
+      nextLevel: newMeta[upgradeId],
+    });
+    refreshWeeklySummary();
+  };
+
   const calculateDayTime = (hour) => {
     if (hour >= 6 && hour < 12) return 'morning';
     if (hour >= 12 && hour < 17) return 'afternoon';
@@ -555,6 +646,12 @@ function GameScreen() {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
   }, [screen]);
+
+  useEffect(() => {
+    if (screen === 'menu') {
+      refreshWeeklySummary();
+    }
+  }, [screen, gameState.rides, gameState.money]);
 
   // Font boyutu çarpanı
   const getFontSizeMultiplier = () => {
@@ -820,13 +917,20 @@ function GameScreen() {
   };
 
   const getAvailableStories = () => PASSENGERS.filter(p => !completedStories.includes(p.id));
+  const getReplayStories = () => PASSENGERS.filter(p => completedStories.includes(p.id));
 
-  // YOLCU AL - TaksiDur uygulamasını aç
+  // YOLCU AL - TaksiDur uygulamasini ac
   const startRide = () => {
     const available = getAvailableStories();
-    if (available.length === 0) { setAllStoriesCompleted(true); return; }
+    const replay = getReplayStories();
 
-    // Önce kontroller
+    if (available.length === 0 && replay.length === 0) {
+      setAllStoriesCompleted(true);
+      return;
+    }
+
+    setAllStoriesCompleted(false);
+
     if (manager.energy <= 15) {
       setScreen('rest');
       return;
@@ -836,32 +940,44 @@ function GameScreen() {
       return;
     }
 
+    logBalanceEvent('ride_search_open', {
+      availableStories: available.length,
+      replayStories: replay.length,
+    });
+
     setScreen('taksidur');
   };
 
-  // Taksimetre artışı callback'i
   const handleTaximeterIncrease = (amount) => {
     setTaximeterAmount(prev => prev + amount);
   };
 
   // TaksiDur'dan yolcu seçildi
   const handleSelectPassenger = (passenger) => {
-    setGameState(prev => ({ ...prev, currentPassenger: passenger, dialogueIndex: 0 }));
+    const passengerWithReplay = passenger?.isReplay
+      ? { ...passenger, replayVariant: passenger.replayVariant || pickReplayVariant() }
+      : passenger;
+
+    setGameState(prev => ({ ...prev, currentPassenger: passengerWithReplay, dialogueIndex: 0 }));
     setLastLocation(passenger.location);
     saveGameState(gameState, null, passenger.location);
 
-    // HER 5 YOLCUDA BİR BONUS OYUN (Surprise event)
-    const totalRides = gameState.rides + 1; // Bu yolculukla birlikte kaçıncı?
+    logBalanceEvent('passenger_selected', {
+      passengerId: passengerWithReplay?.id,
+      isReplay: !!passengerWithReplay?.isReplay,
+      isEventPassenger: !!passengerWithReplay?.isEventPassenger,
+      eventId: weeklyEvent?.id || null,
+    });
+
+    const totalRides = gameState.rides + 1;
     if (totalRides > 0 && totalRides % 5 === 0) {
       Alert.alert(
-        "⚠️ MEYDAN OKUMA! ⚠️",
-        "Beşinci yolcu şerefine özel bir parkur seni bekliyor! Yolcuyu almadan önce yeteneklerini göster!",
+        "?? MEYDAN OKUMA! ??",
+        "Besinci yolcu serefine ozel bir parkur seni bekliyor! Yolcuyu almadan once yeteneklerini goster!",
         [
           {
-            text: "YARIŞA BAŞLA",
+            text: "YARISA BASLA",
             onPress: () => {
-              // -1 özel değer: meydan okuma modu
-              // handleMiniGameResult bunu kontrol edecek ve passenger ekranına yönlendirecek
               setPendingNextChoice(-1);
               setPendingFailChoice(-1);
               setScreen('driving_game');
@@ -875,11 +991,11 @@ function GameScreen() {
     setScreen('passenger');
   };
 
-  // Hikaye bitti - manager güncelle
   const completeRideAndUpdate = (ending) => {
     const duration = 30 + Math.random() * 30;
     const newHour = (manager.hour + Math.ceil(duration / 60)) % 24;
-    const newFuel = Math.max(0, manager.fuel - (5 + Math.random() * 5));
+    const rawFuelCost = (5 + Math.random() * 5) * metaEffects.fuelConsumptionMultiplier;
+    const newFuel = Math.max(0, manager.fuel - rawFuelCost);
     const newEnergy = Math.max(0, manager.energy - (10 + Math.random() * 5));
     const newDay = newHour < manager.hour ? manager.day + 1 : manager.day;
 
@@ -895,11 +1011,9 @@ function GameScreen() {
     setManager(newManager);
     saveManagerState(newManager);
 
-    // Günlük görevleri güncelle (yeni saat ile)
     updateDailyQuests(ending, newHour);
   };
 
-  // Dinlenme
   const handleRest = () => {
     const newManager = {
       ...manager,
@@ -921,7 +1035,7 @@ function GameScreen() {
       setGameState(newState);
       saveGameState(newState);
 
-      // Başarıları kontrol et (para değişti)
+      // Ba?ar?lar? kontrol et (para de?i?ti)
       setTimeout(() => {
         checkAchievements(null, newState, completedStories);
       }, 100);
@@ -929,6 +1043,8 @@ function GameScreen() {
       const newManager = { ...manager, fuel: 100 };
       setManager(newManager);
       saveManagerState(newManager);
+      logBalanceEvent('refuel', { cost });
+      refreshWeeklySummary();
       setScreen('menu');
     }
   };
@@ -940,7 +1056,7 @@ function GameScreen() {
       setGameState(newState);
       saveGameState(newState);
 
-      // Başarıları kontrol et (para değişti)
+      // Ba?ar?lar? kontrol et (para de?i?ti)
       setTimeout(() => {
         checkAchievements(null, newState, completedStories);
       }, 100);
@@ -953,6 +1069,8 @@ function GameScreen() {
       };
       setManager(newManager);
       saveManagerState(newManager);
+      logBalanceEvent('break', { type, cost });
+      refreshWeeklySummary();
       setScreen('menu');
     }
   };
@@ -1033,20 +1151,27 @@ function GameScreen() {
     }
 
     if (ending) {
-      setCurrentEnding(ending);
-      setScreen('ending');
-      completeRideAndUpdate(ending); // Bu fonksiyon içinde updateDailyQuests çağrılıyor
+      const replayVariant = gameState.currentPassenger?.replayVariant;
+      const resolvedEnding = gameState.currentPassenger?.isReplay
+        ? applyReplayVariantToEnding(ending, replayVariant, gameState.currentPassenger?.name)
+        : ending;
 
-      // Radyo kapatma silindi
+      setCurrentEnding(resolvedEnding);
+      setScreen('ending');
+      completeRideAndUpdate(resolvedEnding);
 
       const bonus = calculateBonus();
-      // YENİ KAZANÇ HESABI: Taksimetre + Ending Bonusu
-      const baseFare = Math.floor(taximeterAmount);
-      const endingMoney = ending.money || 0; // Ending'den gelen ek para/ceza
+      const baseFare = Math.floor(taximeterAmount * metaEffects.taximeterMultiplier);
+      const endingMoney = resolvedEnding.money || 0;
       const totalMoney = baseFare + endingMoney;
 
       const earnedMoney = Math.round(totalMoney * (1 + bonus / 100));
-      const earnedRep = Math.round(ending.reputation * (1 + bonus / 100));
+      let earnedRep = Math.round((resolvedEnding.reputation || 0) * (1 + bonus / 100));
+      if (earnedRep < 0) {
+        earnedRep = Math.round(earnedRep * metaEffects.negativeReputationMultiplier);
+      }
+
+      const weeklyAdjusted = applyWeeklyEventBonuses(earnedMoney, earnedRep, weeklyEvent);
 
       const newCompleted = [...completedStories];
       if (!completedStories.includes(gameState.currentPassenger.id)) {
@@ -1056,19 +1181,17 @@ function GameScreen() {
 
       const newState = {
         ...gameState,
-        money: gameState.money + earnedMoney,
+        money: gameState.money + weeklyAdjusted.money,
         rides: gameState.rides + 1,
-        reputation: gameState.reputation + earnedRep, // Negatif itibara izin ver
-        currentEnding: ending
+        reputation: gameState.reputation + weeklyAdjusted.reputation,
+        currentEnding: resolvedEnding
       };
 
-      // İtibar değişimi için haptik geri bildirim
       const repChange = newState.reputation - gameState.reputation;
       if (previousReputation !== null && Math.abs(repChange) > 0) {
         triggerReputationChange(repChange, settings.vibrationEnabled);
       }
 
-      // Yeni rütbe kontrolü
       const oldRank = previousRank || getReputationRank(gameState.reputation);
       const newRank = getReputationRank(newState.reputation);
       if (previousRank !== null && oldRank.min !== newRank.min) {
@@ -1083,9 +1206,18 @@ function GameScreen() {
         AsyncStorage.setItem(COMPLETED_STORIES_KEY, JSON.stringify(newCompleted));
       }
 
-      // Başarıları kontrol et (yeni state ile)
+      logBalanceEvent('ride_completed', {
+        endingType: resolvedEnding.type || 'normal',
+        money: weeklyAdjusted.money,
+        reputation: weeklyAdjusted.reputation,
+        isReplay: !!gameState.currentPassenger?.isReplay,
+        eventId: weeklyEvent?.id || null,
+        eventMoneyBonus: weeklyAdjusted.moneyBonus || 0,
+      });
+      refreshWeeklySummary();
+
       setTimeout(() => {
-        checkAchievements(ending, newState, newCompleted);
+        checkAchievements(resolvedEnding, newState, newCompleted);
       }, 100);
 
       return;
@@ -1154,6 +1286,12 @@ function GameScreen() {
     setTimeout(() => {
       checkAchievements(null, newState, completedStories);
     }, 100);
+    logBalanceEvent('shop_buy', {
+      itemId: item.id,
+      category,
+      cost: item.price,
+    });
+    refreshWeeklySummary();
   };
 
   const handleEquip = (itemId, category) => {
@@ -1362,23 +1500,71 @@ function GameScreen() {
         </View>
 
         {/* Günlük Görevler */}
-        <View style={styles.dailyQuestsContainer}>
-          <Text style={styles.dailyQuestsTitle}>📋 GÜNLÜK GÖREVLER</Text>
-          <View style={styles.questItem}>
-            <Text style={styles.questText}>
-              {dailyQuests.ridesToday >= 5 ? '✅' : '⭕'} Bugün 5 yolcu taşı ({dailyQuests.ridesToday}/5)
-            </Text>
+        <View style={styles.chainCard}>
+          <Text style={styles.chainTitle}>7 GUNLUK ZINCIR - Gun {(currentChainStep?.id || 'day_1').split('_')[1]}</Text>
+          <Text style={styles.chainSubtitle}>{currentChainStep?.title}</Text>
+          {chainProgress.objectives.map((objective) => (
+            <View key={objective.key} style={styles.chainObjectiveRow}>
+              <Text style={styles.chainObjectiveText}>
+                {objective.done ? '[X]' : '[ ]'} {objective.label}
+              </Text>
+              <Text style={styles.chainObjectiveCount}>{objective.current}/{objective.target}</Text>
+            </View>
+          ))}
+          <View style={styles.chainRewardRow}>
+            <Text style={styles.chainRewardText}>Odul: +{currentChainStep?.reward?.money || 0} TL / +{currentChainStep?.reward?.reputation || 0} itibar</Text>
+            <Text style={styles.chainRewardText}>Streak: {dailyQuests.streakDays} (En iyi: {dailyQuests.bestStreak})</Text>
           </View>
-          <View style={styles.questItem}>
-            <Text style={styles.questText}>
-              {dailyQuests.nightRides >= 3 ? '✅' : '⭕'} Gece 3 yolculuk yap ({dailyQuests.nightRides}/3)
+          <TouchableOpacity
+            style={[styles.chainClaimBtn, !(dailyQuests.claimable && !dailyQuests.chainClaimedToday) && styles.chainClaimBtnDisabled]}
+            onPress={handleClaimDailyChainReward}
+            disabled={!(dailyQuests.claimable && !dailyQuests.chainClaimedToday)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.chainClaimBtnText}>
+              {dailyQuests.chainClaimedToday ? 'BUGUN TOPLANDI' : dailyQuests.claimable ? 'ODULU TOPLA' : 'HEDEFI TAMAMLA'}
             </Text>
-          </View>
-          <View style={styles.questItem}>
-            <Text style={styles.questText}>
-              {dailyQuests.policeFreeRides >= 10 ? '✅' : '⭕'} Polissiz 10 sefer ({dailyQuests.policeFreeRides}/10)
-            </Text>
-          </View>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.weeklyEventCard}>
+          <Text style={styles.weeklyEventCardTitle}>{weeklyEvent.name}</Text>
+          <Text style={styles.weeklyEventCardDesc}>{weeklyEvent.description}</Text>
+          <Text style={styles.weeklyEventCardBonus}>Bonus: +%{weeklyEvent.bonusMoneyPct} para / +%{weeklyEvent.bonusReputationPct} pozitif itibar</Text>
+        </View>
+
+        <View style={styles.metaTreeCard}>
+          <Text style={styles.metaTreeTitle}>KALICI TAKSI GELISTIRMELERI</Text>
+          {Object.keys(META_UPGRADES).map((upgradeId) => {
+            const upgrade = META_UPGRADES[upgradeId];
+            const level = metaProgress[upgradeId] || 0;
+            const cost = getUpgradeCost(upgradeId, level);
+            const isMax = level >= upgrade.maxLevel;
+            const canBuy = !isMax && gameState.money >= cost;
+            return (
+              <View key={upgradeId} style={styles.metaUpgradeRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metaUpgradeName}>{upgrade.label} Lv.{level}/{upgrade.maxLevel}</Text>
+                  <Text style={styles.metaUpgradeEffect}>{upgrade.effectLabel}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.metaUpgradeBtn, !canBuy && styles.metaUpgradeBtnDisabled]}
+                  onPress={() => handlePurchaseMetaUpgrade(upgradeId)}
+                  disabled={!canBuy}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.metaUpgradeBtnText}>{isMax ? 'MAX' : `${cost} TL`}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={styles.balanceSummaryCard}>
+          <Text style={styles.balanceSummaryTitle}>HAFTALIK DENGE OZETI ({weeklySummary.weekId || '-'})</Text>
+          <Text style={styles.balanceSummaryLine}>Ride: {weeklySummary.ridesCompleted} | Ortalama: {weeklySummary.avgRideMoney} TL | Polis Sonu: {weeklySummary.policeEndings}</Text>
+          <Text style={styles.balanceSummaryLine}>Gorev Odulu: {weeklySummary.dailyClaims} | Upgrade: {weeklySummary.upgrades} | Replay: {weeklySummary.replayRides}</Text>
+          <Text style={styles.balanceSummaryHint}>{getBalanceHint(weeklySummary)}</Text>
         </View>
 
         {calculateBonus() > 0 && (
@@ -1419,10 +1605,10 @@ function GameScreen() {
         )}
 
         <Text style={styles.storyCounter}>
-          {allStoriesCompleted ? '✓ Tüm hikayeler tamamlandı!' : `${getAvailableStories().length} hikaye bekliyor`}
+          {(getAvailableStories().length === 0 && getReplayStories().length === 0) ? 'Tum hikayeler tamamlandi!' : `${getAvailableStories().length} yeni + ${getReplayStories().length} replay hikaye`}
         </Text>
 
-        {allStoriesCompleted ? (
+        {(getAvailableStories().length === 0 && getReplayStories().length === 0) ? (
           <TouchableOpacity style={[styles.startBtn, { backgroundColor: COLORS.purple }]} onPress={resetStories} activeOpacity={0.8}>
             <Text style={styles.startBtnText}>HİKAYELERİ SIFIRLA</Text>
           </TouchableOpacity>
@@ -1855,6 +2041,16 @@ function GameScreen() {
               </View>
             </View>
 
+            <View style={styles.chainEndingCard}>
+              <Text style={styles.chainEndingTitle}>7 GUNLUK ZINCIR DURUMU</Text>
+              <Text style={styles.chainEndingLine}>
+                Gun {(currentChainStep?.id || 'day_1').split('_')[1]}: {currentChainStep?.title}
+              </Text>
+              <Text style={styles.chainEndingLine}>
+                Streak: {dailyQuests.streakDays} | Bugun odul: {dailyQuests.chainClaimedToday ? 'Toplandi' : dailyQuests.claimable ? 'Hazir' : 'Devam ediyor'}
+              </Text>
+            </View>
+
             <TouchableOpacity style={[styles.continueBtn, { backgroundColor: endingColor }]} onPress={continueGame} activeOpacity={0.8}>
               <Text style={[styles.continueBtnText, { color: '#000' }]}>
                 {currentEnding.type === 'normal' ? 'DEVAM ET' : 'YENİ HİKAYE'}
@@ -1897,7 +2093,9 @@ function GameScreen() {
           onClose={() => setScreen('menu')}
           dayTime={manager.dayTime}
           hour={manager.hour}
-          lastTaxiLocation={lastLocation} // Son konumu geçiriyoruz
+          weeklyEvent={weeklyEvent}
+          allowReplay={true}
+          lastTaxiLocation={lastLocation}
           onTaximeterIncrease={handleTaximeterIncrease}
         />
       </View>
@@ -2148,6 +2346,190 @@ const styles = StyleSheet.create({
   bonusText: { color: COLORS.bg, fontWeight: 'bold', fontSize: normalize(12) },
 
   // Günlük Görevler
+  chainCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    marginBottom: normalize(12),
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.cardLight,
+  },
+  chainTitle: {
+    fontSize: normalize(12),
+    color: COLORS.accent,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: normalize(4),
+  },
+  chainSubtitle: {
+    fontSize: normalize(11),
+    color: COLORS.text,
+    marginBottom: normalize(8),
+    fontWeight: '600',
+  },
+  chainObjectiveRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: normalize(6),
+  },
+  chainObjectiveText: {
+    fontSize: normalize(10),
+    color: COLORS.text,
+    flex: 1,
+    marginRight: normalize(8),
+  },
+  chainObjectiveCount: {
+    fontSize: normalize(10),
+    color: COLORS.textDim,
+    fontWeight: '700',
+  },
+  chainRewardRow: {
+    marginTop: normalize(4),
+    marginBottom: normalize(8),
+  },
+  chainRewardText: {
+    fontSize: normalize(10),
+    color: COLORS.textDim,
+    marginBottom: normalize(2),
+  },
+  chainClaimBtn: {
+    backgroundColor: COLORS.accent,
+    paddingVertical: normalize(10),
+    borderRadius: normalize(10),
+    alignItems: 'center',
+  },
+  chainClaimBtnDisabled: {
+    backgroundColor: COLORS.cardLight,
+  },
+  chainClaimBtnText: {
+    fontSize: normalize(10),
+    color: COLORS.bg,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  weeklyEventCard: {
+    backgroundColor: '#163033',
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    marginBottom: normalize(12),
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#2a5a60',
+  },
+  weeklyEventCardTitle: {
+    fontSize: normalize(12),
+    color: COLORS.success,
+    fontWeight: '700',
+    marginBottom: normalize(4),
+  },
+  weeklyEventCardDesc: {
+    fontSize: normalize(10),
+    color: COLORS.text,
+    marginBottom: normalize(6),
+  },
+  weeklyEventCardBonus: {
+    fontSize: normalize(10),
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  metaTreeCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    marginBottom: normalize(12),
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.cardLight,
+  },
+  metaTreeTitle: {
+    fontSize: normalize(11),
+    color: COLORS.accent,
+    fontWeight: '700',
+    marginBottom: normalize(8),
+    letterSpacing: 1,
+  },
+  metaUpgradeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: normalize(8),
+    gap: normalize(8),
+  },
+  metaUpgradeName: {
+    fontSize: normalize(11),
+    color: COLORS.text,
+    fontWeight: '600',
+  },
+  metaUpgradeEffect: {
+    fontSize: normalize(9),
+    color: COLORS.textDim,
+    marginTop: normalize(2),
+  },
+  metaUpgradeBtn: {
+    backgroundColor: COLORS.success,
+    borderRadius: normalize(8),
+    paddingHorizontal: normalize(10),
+    paddingVertical: normalize(8),
+    minWidth: normalize(74),
+    alignItems: 'center',
+  },
+  metaUpgradeBtnDisabled: {
+    backgroundColor: COLORS.cardLight,
+  },
+  metaUpgradeBtnText: {
+    fontSize: normalize(10),
+    color: COLORS.bg,
+    fontWeight: '700',
+  },
+  balanceSummaryCard: {
+    backgroundColor: 'rgba(157, 78, 221, 0.12)',
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    marginBottom: normalize(12),
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(157, 78, 221, 0.45)',
+  },
+  balanceSummaryTitle: {
+    fontSize: normalize(11),
+    color: COLORS.purple,
+    fontWeight: '700',
+    marginBottom: normalize(6),
+  },
+  balanceSummaryLine: {
+    fontSize: normalize(10),
+    color: COLORS.text,
+    marginBottom: normalize(4),
+  },
+  balanceSummaryHint: {
+    fontSize: normalize(10),
+    color: COLORS.textDim,
+    fontStyle: 'italic',
+  },
+  chainEndingCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: normalize(12),
+    padding: normalize(12),
+    width: '100%',
+    marginBottom: normalize(18),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  chainEndingTitle: {
+    color: COLORS.accent,
+    fontSize: normalize(11),
+    fontWeight: '700',
+    marginBottom: normalize(6),
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  chainEndingLine: {
+    color: COLORS.text,
+    fontSize: normalize(10),
+    textAlign: 'center',
+    marginBottom: normalize(4),
+  },
   dailyQuestsContainer: {
     backgroundColor: COLORS.card,
     borderRadius: normalize(12),
