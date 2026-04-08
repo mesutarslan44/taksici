@@ -18,6 +18,7 @@ import {
   DEFAULT_DAILY_QUESTS,
   DEFAULT_META_PROGRESS,
   META_UPGRADES,
+  getDayKey,
   rolloverDailyQuests,
   updateQuestsOnRide,
   getCurrentChainStep,
@@ -481,7 +482,7 @@ function GameScreen() {
     try {
       const saved = await AsyncStorage.getItem(DAILY_QUESTS_KEY);
       const legacyReset = await AsyncStorage.getItem(LAST_QUEST_RESET_KEY);
-      const todayKey = new Date().toISOString().slice(0, 10);
+      const todayKey = getDayKey();
       const parsed = saved ? { ...DEFAULT_DAILY_QUESTS, ...JSON.parse(saved) } : { ...DEFAULT_DAILY_QUESTS };
 
       if (!parsed.lastResetDay && legacyReset) {
@@ -551,7 +552,7 @@ function GameScreen() {
   };
 
   const updateDailyQuests = (ending, hour = manager.hour) => {
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = getDayKey();
 
     setDailyQuests(prev => {
       const rolled = rolloverDailyQuests(prev, todayKey);
@@ -563,7 +564,7 @@ function GameScreen() {
 
   const handleClaimDailyChainReward = () => {
     setDailyQuests(prev => {
-      const rolled = rolloverDailyQuests(prev, new Date().toISOString().slice(0, 10));
+      const rolled = rolloverDailyQuests(prev, getDayKey());
       const result = claimDailyChain(rolled);
       if (!result.claimed) return rolled;
 
@@ -1156,10 +1157,6 @@ function GameScreen() {
         ? applyReplayVariantToEnding(ending, replayVariant, gameState.currentPassenger?.name)
         : ending;
 
-      setCurrentEnding(resolvedEnding);
-      setScreen('ending');
-      completeRideAndUpdate(resolvedEnding);
-
       const bonus = calculateBonus();
       const baseFare = Math.floor(taximeterAmount * metaEffects.taximeterMultiplier);
       const endingMoney = resolvedEnding.money || 0;
@@ -1172,6 +1169,18 @@ function GameScreen() {
       }
 
       const weeklyAdjusted = applyWeeklyEventBonuses(earnedMoney, earnedRep, weeklyEvent);
+      const endingForDisplay = {
+        ...resolvedEnding,
+        appliedMoney: weeklyAdjusted.money,
+        appliedReputation: weeklyAdjusted.reputation,
+        appliedBonusPct: bonus,
+        appliedEventMoneyBonus: weeklyAdjusted.moneyBonus || 0,
+        appliedEventReputationBonus: weeklyAdjusted.reputationBonus || 0,
+      };
+
+      setCurrentEnding(endingForDisplay);
+      setScreen('ending');
+      completeRideAndUpdate(endingForDisplay);
 
       const newCompleted = [...completedStories];
       if (!completedStories.includes(gameState.currentPassenger.id)) {
@@ -1184,7 +1193,7 @@ function GameScreen() {
         money: gameState.money + weeklyAdjusted.money,
         rides: gameState.rides + 1,
         reputation: gameState.reputation + weeklyAdjusted.reputation,
-        currentEnding: resolvedEnding
+        currentEnding: endingForDisplay
       };
 
       const repChange = newState.reputation - gameState.reputation;
@@ -1207,7 +1216,7 @@ function GameScreen() {
       }
 
       logBalanceEvent('ride_completed', {
-        endingType: resolvedEnding.type || 'normal',
+        endingType: endingForDisplay.type || 'normal',
         money: weeklyAdjusted.money,
         reputation: weeklyAdjusted.reputation,
         isReplay: !!gameState.currentPassenger?.isReplay,
@@ -1217,7 +1226,7 @@ function GameScreen() {
       refreshWeeklySummary();
 
       setTimeout(() => {
-        checkAchievements(resolvedEnding, newState, newCompleted);
+        checkAchievements(endingForDisplay, newState, newCompleted);
       }, 100);
 
       return;
@@ -1720,7 +1729,11 @@ function GameScreen() {
               <Text style={styles.fallbackEmoji}>{p.avatar}</Text>
             </View>
           )}
-          <View style={styles.portraitOverlay} />
+          <LinearGradient
+            colors={['transparent', 'rgba(10,10,15,0.95)']}
+            style={styles.portraitOverlay}
+            pointerEvents="none"
+          />
         </View>
 
         {/* Alt Bilgi Kartı */}
@@ -1957,7 +1970,15 @@ function GameScreen() {
   // BİTİŞ EKRANI
   const renderEndingScreen = () => {
     if (!currentEnding) return null;
-    const bonus = calculateBonus();
+    const bonus = typeof currentEnding.appliedBonusPct === 'number'
+      ? currentEnding.appliedBonusPct
+      : calculateBonus();
+    const endingMoneyDisplay = typeof currentEnding.appliedMoney === 'number'
+      ? currentEnding.appliedMoney
+      : Math.round((currentEnding.money || 0) * (1 + bonus / 100));
+    const endingReputationDisplay = typeof currentEnding.appliedReputation === 'number'
+      ? currentEnding.appliedReputation
+      : Math.round((currentEnding.reputation || 0) * (1 + bonus / 100));
 
     let endingIcon = '🏁';
     let endingColor = COLORS.text;
@@ -1994,14 +2015,14 @@ function GameScreen() {
               <View style={styles.endingStats}>
                 <View style={styles.endingStat}>
                   <Text style={styles.endingStatValue}>
-                    {(currentEnding.money || 0) >= 0 ? '+' : ''}₺{Math.round((currentEnding.money || 0) * (1 + bonus / 100))}
+                    {endingMoneyDisplay >= 0 ? '+' : ''}₺{Math.round(endingMoneyDisplay)}
                   </Text>
                   <Text style={styles.endingStatLabel}>KAZANÇ</Text>
                 </View>
                 <View style={styles.statDividerVertical} />
                 <View style={styles.endingStat}>
-                  <Text style={[styles.endingStatValue, { color: (currentEnding.reputation || 0) >= 0 ? COLORS.success : COLORS.danger }]}>
-                    {(currentEnding.reputation || 0) >= 0 ? '+' : ''}{Math.round((currentEnding.reputation || 0) * (1 + bonus / 100))}
+                  <Text style={[styles.endingStatValue, { color: endingReputationDisplay >= 0 ? COLORS.success : COLORS.danger }]}>
+                    {endingReputationDisplay >= 0 ? '+' : ''}{Math.round(endingReputationDisplay)}
                   </Text>
                   <Text style={styles.endingStatLabel}>İTİBAR</Text>
                 </View>
@@ -2766,7 +2787,7 @@ const styles = StyleSheet.create({
   fullPortrait: { width: '100%', height: '100%' },
   fallbackPortrait: { flex: 1, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
   fallbackEmoji: { fontSize: normalize(120) },
-  portraitOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(transparent, #0a0a0f)' },
+  portraitOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' },
   passengerInfoCard: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,10,15,0.95)', padding: normalize(24), borderTopLeftRadius: normalize(24), borderTopRightRadius: normalize(24) },
   passengerBadge: { flexDirection: 'row', gap: normalize(16), marginBottom: normalize(12) },
   badgeLocation: { color: COLORS.textDim, fontSize: normalize(13) },
@@ -2780,6 +2801,7 @@ const styles = StyleSheet.create({
   dialogueScreenFull: { padding: 0 },
   dialoguePortraitBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   dialoguePortraitImage: { width: '100%', height: '100%', opacity: 0.3 },
+  dialoguePortraitOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,15,0.55)' },
   dialogueCharacterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: normalize(20), paddingVertical: normalize(12) },
   dialogueCharacterSmall: { width: normalize(50), height: normalize(50), borderRadius: normalize(25), borderWidth: 2, borderColor: COLORS.accent, marginRight: normalize(12) },
   dialogueAvatarSmall: { fontSize: normalize(36), marginRight: normalize(12) },
@@ -2968,14 +2990,14 @@ const styles = StyleSheet.create({
   },
 
   // Başarılar Rozet Satırı
-  achievementsRow: {
+  legacyAchievementsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: normalize(12),
     gap: normalize(8),
   },
-  achievementBadge: {
+  legacyAchievementBadge: {
     width: normalize(40),
     height: normalize(40),
     borderRadius: normalize(20),
@@ -2985,10 +3007,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.accent,
   },
-  achievementEmoji: {
+  legacyAchievementEmoji: {
     fontSize: normalize(20),
   },
-  achievementMoreBadge: {
+  legacyAchievementMoreBadge: {
     width: normalize(40),
     height: normalize(40),
     borderRadius: normalize(20),
@@ -2998,12 +3020,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.cardLight,
   },
-  achievementMoreText: {
+  legacyAchievementMoreText: {
     fontSize: normalize(10),
     color: COLORS.textDim,
     fontWeight: '700',
   },
-  achievementViewAllBtn: {
+  legacyAchievementViewAllBtn: {
     paddingHorizontal: normalize(12),
     paddingVertical: normalize(6),
     borderRadius: normalize(12),
@@ -3011,14 +3033,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.card,
   },
-  achievementViewAllText: {
+  legacyAchievementViewAllText: {
     fontSize: normalize(10),
     color: COLORS.accent,
     fontWeight: '600',
   },
 
   // Başarılar Detay Ekranı
-  achievementsHeader: {
+  legacyAchievementsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -3027,28 +3049,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardLight,
   },
-  achievementsBackBtn: {
+  legacyAchievementsBackBtn: {
     paddingVertical: normalize(8),
     paddingHorizontal: normalize(12),
   },
-  achievementsBackText: {
+  legacyAchievementsBackText: {
     fontSize: normalize(14),
     color: COLORS.accent,
     fontWeight: '600',
   },
-  achievementsHeaderTitle: {
+  legacyAchievementsHeaderTitle: {
     fontSize: normalize(20),
     fontWeight: '700',
     color: COLORS.text,
     letterSpacing: 1,
   },
-  achievementsScroll: {
+  legacyAchievementsScroll: {
     flex: 1,
   },
-  achievementsContent: {
+  legacyAchievementsContent: {
     paddingBottom: normalize(20),
   },
-  achievementCard: {
+  legacyAchievementCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.card,
     borderRadius: normalize(12),
@@ -3058,50 +3080,50 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardLight,
     position: 'relative',
   },
-  achievementCardUnlocked: {
+  legacyAchievementCardUnlocked: {
     borderColor: COLORS.accent,
     borderWidth: 2,
   },
-  achievementCardLocked: {
+  legacyAchievementCardLocked: {
     opacity: 0.5,
   },
-  achievementCardLeft: {
+  legacyAchievementCardLeft: {
     marginRight: normalize(12),
   },
-  achievementCardEmoji: {
+  legacyAchievementCardEmoji: {
     fontSize: normalize(32),
   },
-  achievementCardEmojiLocked: {
+  legacyAchievementCardEmojiLocked: {
     opacity: 0.3,
   },
-  achievementCardRight: {
+  legacyAchievementCardRight: {
     flex: 1,
   },
-  achievementCardName: {
+  legacyAchievementCardName: {
     fontSize: normalize(16),
     fontWeight: '700',
     color: COLORS.text,
     marginBottom: normalize(4),
   },
-  achievementCardNameLocked: {
+  legacyAchievementCardNameLocked: {
     color: COLORS.textDim,
   },
-  achievementCardDesc: {
+  legacyAchievementCardDesc: {
     fontSize: normalize(12),
     color: COLORS.textDim,
     lineHeight: normalize(18),
     marginBottom: normalize(4),
   },
-  achievementCardDescLocked: {
+  legacyAchievementCardDescLocked: {
     color: COLORS.textDim,
     opacity: 0.7,
   },
-  achievementCardDate: {
+  legacyAchievementCardDate: {
     fontSize: normalize(10),
     color: COLORS.accent,
     marginTop: normalize(4),
   },
-  achievementCheckmark: {
+  legacyAchievementCheckmark: {
     position: 'absolute',
     top: normalize(8),
     right: normalize(8),
@@ -3112,18 +3134,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  achievementCheckmarkText: {
+  legacyAchievementCheckmarkText: {
     fontSize: normalize(14),
     color: COLORS.bg,
     fontWeight: '700',
   },
-  achievementsFooter: {
+  legacyAchievementsFooter: {
     paddingTop: normalize(16),
     borderTopWidth: 1,
     borderTopColor: COLORS.cardLight,
     alignItems: 'center',
   },
-  achievementsFooterText: {
+  legacyAchievementsFooterText: {
     fontSize: normalize(12),
     color: COLORS.textDim,
     fontWeight: '600',
