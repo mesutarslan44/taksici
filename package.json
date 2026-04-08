@@ -8,7 +8,9 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "optimize:images": "powershell -ExecutionPolicy Bypass -File .\\scripts\\optimize-images-webp.ps1 -Quality 80",
-    "optimize:images:dry": "powershell -ExecutionPolicy Bypass -File .\\scripts\\optimize-images-webp.ps1 -Quality 80 -DryRun"
+    "optimize:images:dry": "powershell -ExecutionPolicy Bypass -File .\\scripts\\optimize-images-webp.ps1 -Quality 80 -DryRun",
+    "release:check": "powershell -ExecutionPolicy Bypass -File .\\scripts\\release-check.ps1",
+    "release:check:strict": "powershell -ExecutionPolicy Bypass -File .\\scripts\\release-check.ps1 -StrictExport"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

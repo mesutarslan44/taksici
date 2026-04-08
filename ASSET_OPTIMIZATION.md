@@ -4,8 +4,9 @@ Bu dokuman, uygulama boyutunu dusurmek ve D1 indirme/acilis oranlarini iyilestir
 
 ## 1) Hazirlik
 
-- `cwebp` aracini sisteme kur.
-- Kurulumdan sonra terminalden `cwebp -version` calistigini dogrula.
+- `ffmpeg` aracini sisteme kur.
+- Kurulumdan sonra terminalden `ffmpeg -version` calistigini dogrula.
+- Alternatif olarak `winget install Gyan.FFmpeg` kullanabilirsin.
 
 ## 2) Dry-run
 
@@ -26,10 +27,20 @@ npm run optimize:images
 
 ## 4) Uygulamaya gecis
 
-- Kritik buyuk dosyalardan baslayarak importlari `.webp` uzantilarina gecir.
+- Referanslari `.webp` uzantilarina gecir.
 - QA testinden sonra gereksiz eski bitmapleri temizle.
 
-## 5) Hedef metrikler
+## 5) Release dogrulama
 
-- `assets/characters` toplam boyutunda `%30+` iyilesme.
-- Ilk acilis ve ilk bundle indirme suresinde gozle gorulur iyilesme.
+```bash
+npm run release:check
+npm run release:check:strict
+```
+
+- `release:check`: hizli guvenlik + varlik tutarliligi kontrolu.
+- `release:check:strict`: ek olarak Android Expo export testi.
+
+## 6) Hedef metrikler
+
+- `assets/characters` + `assets/shop` kaynaklarinda yaklasik `70.20 MB -> 5.02 MB` WebP cikti boyutu.
+- Ilk acilis ve bundle indirme suresinde gozle gorulur iyilesme.
