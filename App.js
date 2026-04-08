@@ -1362,7 +1362,7 @@ function GameScreen() {
     <Animated.View style={[styles.screen, styles.menuScreen, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
-        <Image source={require('./assets/bg_rain_dark.png')} style={{ width: width, height: height }} resizeMode="cover" blurRadius={3} />
+        <Image source={require('./assets/bg_rain_dark.webp')} style={{ width: width, height: height }} resizeMode="cover" blurRadius={3} />
       </View>
 
       {/* Üst Butonlar - Sağ Üst - Yan Yana */}

@@ -96,7 +96,30 @@ foreach ($file in $assetFiles) {
   }
 }
 
-# 4) Optional strict export
+# 4) Heavy asset refs must stay on WebP
+$heavyLegacyPattern = 'assets/(bg_rain_dark|turk_cayi|turk_kahvesi)\.png'
+$heavyFiles = @(
+  (Join-Path $projectRoot 'App.js'),
+  (Join-Path $projectRoot 'RestScreens.js')
+)
+
+$heavyLegacyCount = 0
+foreach ($file in $heavyFiles) {
+  if (-not (Test-Path $file)) {
+    continue
+  }
+  $text = Get-Content -Path $file -Raw
+  $matches = [regex]::Matches($text, $heavyLegacyPattern)
+  $heavyLegacyCount += $matches.Count
+}
+
+if ($heavyLegacyCount -gt 0) {
+  Fail "Heavy assets still reference png: $heavyLegacyCount"
+} else {
+  Pass 'Heavy assets use WebP references.'
+}
+
+# 5) Optional strict export
 if ($StrictExport) {
   Write-Host '[release-check] Strict mode: running Expo Android export.'
   Push-Location $projectRoot

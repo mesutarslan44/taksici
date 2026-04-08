@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, PixelRatio } from 'react-native';
 
 // Çay ve Kahve görselleri
-const TEA_IMAGE = require('./assets/turk_cayi.png');
-const COFFEE_IMAGE = require('./assets/turk_kahvesi.png');
+const TEA_IMAGE = require('./assets/turk_cayi.webp');
+const COFFEE_IMAGE = require('./assets/turk_kahvesi.webp');
 
 const { width, height } = Dimensions.get('window');
 

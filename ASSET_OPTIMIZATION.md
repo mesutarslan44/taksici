@@ -6,7 +6,7 @@ Bu dokuman, uygulama boyutunu dusurmek ve D1 indirme/acilis oranlarini iyilestir
 
 - `ffmpeg` aracini sisteme kur.
 - Kurulumdan sonra terminalden `ffmpeg -version` calistigini dogrula.
-- Alternatif olarak `winget install Gyan.FFmpeg` kullanabilirsin.
+- Alternatif: `winget install Gyan.FFmpeg`.
 
 ## 2) Dry-run
 
@@ -22,8 +22,12 @@ Bu adim donusecek dosyalari kontrol eder, dosya yazmaz.
 npm run optimize:images
 ```
 
-- `assets/characters` ve `assets/shop` altindaki `png/jpg/jpeg` dosyalari `.webp` olarak uretilir.
-- Kaynaktan yeni olan dosyalar tekrar donusturulur.
+Bu komut su varliklari kapsar:
+- `assets/characters/*`
+- `assets/shop/*`
+- `assets/bg_rain_dark.png`
+- `assets/turk_cayi.png`
+- `assets/turk_kahvesi.png`
 
 ## 4) Uygulamaya gecis
 
@@ -40,7 +44,8 @@ npm run release:check:strict
 - `release:check`: hizli guvenlik + varlik tutarliligi kontrolu.
 - `release:check:strict`: ek olarak Android Expo export testi.
 
-## 6) Hedef metrikler
+## 6) Olculen Sonuc
 
-- `assets/characters` + `assets/shop` kaynaklarinda yaklasik `70.20 MB -> 5.02 MB` WebP cikti boyutu.
-- Ilk acilis ve bundle indirme suresinde gozle gorulur iyilesme.
+- Karakter + shop havuzu: `70.20 MB -> 5.02 MB`
+- Heavy UI gorselleri: `4.59 MB -> 0.16 MB`
+- Toplam optimize edilen set: `74.79 MB -> 5.18 MB`

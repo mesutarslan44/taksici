@@ -11,6 +11,12 @@ $targets = @(
   (Join-Path $projectRoot 'assets\shop')
 )
 
+$explicitFiles = @(
+  (Join-Path $projectRoot 'assets\bg_rain_dark.png'),
+  (Join-Path $projectRoot 'assets\turk_cayi.png'),
+  (Join-Path $projectRoot 'assets\turk_kahvesi.png')
+)
+
 function Resolve-FfmpegPath {
   $direct = Get-Command ffmpeg -ErrorAction SilentlyContinue
   if ($direct) { return $direct.Source }
@@ -45,8 +51,18 @@ if (-not $ffmpegPath) {
 
 Write-Host "[optimize-images-webp] Donusturucu: $ffmpegPath"
 
-$files = Get-ChildItem -Path $targets -Recurse -File |
-  Where-Object { $_.Extension -match '^\\.(png|jpg|jpeg)$' }
+$files = @(
+  Get-ChildItem -Path $targets -Recurse -File |
+    Where-Object { $_.Extension -match '^\.(png|jpg|jpeg)$' }
+)
+
+foreach ($extraFile in $explicitFiles) {
+  if (Test-Path $extraFile) {
+    $files += Get-Item -LiteralPath $extraFile
+  }
+}
+
+$files = $files | Sort-Object FullName -Unique
 
 if (-not $files -or $files.Count -eq 0) {
   Write-Host '[optimize-images-webp] Hedef klasorlerde gorsel bulunamadi.'
