@@ -18,6 +18,39 @@ const quality = qualityArg ? Number(qualityArg.split('=')[1]) : 80;
 const run = (cmd, cmdArgs) => spawnSync(cmd, cmdArgs, { stdio: 'pipe', encoding: 'utf8' });
 
 const hasCwebp = () => run('cwebp', ['-version']).status === 0;
+const findFfmpegFromWinget = () => {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) return null;
+
+  const basePackagesDir = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages');
+  if (!fs.existsSync(basePackagesDir)) return null;
+
+  const vendorDirs = fs.readdirSync(basePackagesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.toLowerCase().startsWith('gyan.ffmpeg_'))
+    .map((entry) => path.join(basePackagesDir, entry.name));
+
+  for (const vendorDir of vendorDirs) {
+    const innerDirs = fs.readdirSync(vendorDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(vendorDir, entry.name));
+
+    for (const innerDir of innerDirs) {
+      const candidate = path.join(innerDir, 'bin', 'ffmpeg.exe');
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+};
+
+const resolveFfmpegCmd = () => {
+  if (run('ffmpeg', ['-version']).status === 0) return 'ffmpeg';
+  const wingetPath = findFfmpegFromWinget();
+  if (!wingetPath) return null;
+  return run(wingetPath, ['-version']).status === 0 ? wingetPath : null;
+};
 
 const walkImages = (dir) => {
   if (!fs.existsSync(dir)) return [];
@@ -34,18 +67,23 @@ const walkImages = (dir) => {
   return files;
 };
 
-const convertToWebp = (inputFile, outputFile) => {
-  const result = run('cwebp', ['-q', String(quality), inputFile, '-o', outputFile]);
+const convertToWebp = (inputFile, outputFile, converter, ffmpegCmd) => {
+  const result = converter === 'cwebp'
+    ? run('cwebp', ['-q', String(quality), inputFile, '-o', outputFile])
+    : run(ffmpegCmd, ['-y', '-hide_banner', '-loglevel', 'error', '-i', inputFile, '-q:v', String(quality), '-compression_level', '6', outputFile]);
   return result.status === 0;
 };
 
 const main = () => {
-  if (!hasCwebp()) {
-    console.log('[optimize-images-webp] cwebp bulunamadi.');
-    console.log('Kurulum: https://developers.google.com/speed/webp/download');
+  const ffmpegCmd = resolveFfmpegCmd();
+  const converter = hasCwebp() ? 'cwebp' : ffmpegCmd ? 'ffmpeg' : null;
+  if (!converter) {
+    console.log('[optimize-images-webp] Donusum araci bulunamadi (cwebp/ffmpeg).');
+    console.log('Kurulum: https://developers.google.com/speed/webp/download veya ffmpeg');
     console.log('Ardindan tekrar calistir: npm run optimize:images');
     process.exit(0);
   }
+  console.log(`[optimize-images-webp] Donusturucu: ${converter}`);
 
   const imageFiles = targetDirs.flatMap(walkImages);
   if (imageFiles.length === 0) {
@@ -75,7 +113,7 @@ const main = () => {
       continue;
     }
 
-    const ok = convertToWebp(imageFile, webpFile);
+    const ok = convertToWebp(imageFile, webpFile, converter, ffmpegCmd);
     if (ok) {
       convertedCount += 1;
       outputBytes += fs.statSync(webpFile).size;

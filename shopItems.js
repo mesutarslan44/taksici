@@ -5,20 +5,20 @@ export const SHOP_CATEGORIES = [
 
 export const SHOP_ITEMS = {
     mirror: [
-        { id: 'mirror_nazar', name: 'Nazar Boncuğu', price: 0, effect: 0, image: require('./assets/shop/mirror_nazar.png'), emoji: '🧿', description: 'Başlangıç', owned: true },
-        { id: 'mirror_kuran', name: 'Küçük Kuran', price: 250, effect: 5, image: require('./assets/shop/mirror_kuran.png'), emoji: '📗', description: '+%5 itibar' },
-        { id: 'mirror_gs', name: 'Galatasaray Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_gs.png'), emoji: '🦁', description: 'Cim bom bom' },
-        { id: 'mirror_fb', name: 'Fenerbahçe Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_fb.png'), emoji: '🐤', description: 'Sarı kanarya' },
-        { id: 'mirror_bjk', name: 'Beşiktaş Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_bjk.png'), emoji: '🦅', description: 'Kara kartal' },
-        { id: 'mirror_ts', name: 'Trabzonspor Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_ts.png'), emoji: '⚓', description: 'Fırtına' },
-        { id: 'mirror_gold', name: 'Altın Zincir', price: 1000, effect: 8, image: require('./assets/shop/mirror_gold.png'), emoji: '⛓️', description: 'Lüks görünüm' },
-        { id: 'mirror_led', name: 'LED Işıklı Logo', price: 2000, effect: 12, image: require('./assets/shop/mirror_led.png'), emoji: '💡', description: 'Gece efekti' },
+        { id: 'mirror_nazar', name: 'Nazar Boncuğu', price: 0, effect: 0, image: require('./assets/shop/mirror_nazar.webp'), emoji: '🧿', description: 'Başlangıç', owned: true },
+        { id: 'mirror_kuran', name: 'Küçük Kuran', price: 250, effect: 5, image: require('./assets/shop/mirror_kuran.webp'), emoji: '📗', description: '+%5 itibar' },
+        { id: 'mirror_gs', name: 'Galatasaray Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_gs.webp'), emoji: '🦁', description: 'Cim bom bom' },
+        { id: 'mirror_fb', name: 'Fenerbahçe Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_fb.webp'), emoji: '🐤', description: 'Sarı kanarya' },
+        { id: 'mirror_bjk', name: 'Beşiktaş Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_bjk.webp'), emoji: '🦅', description: 'Kara kartal' },
+        { id: 'mirror_ts', name: 'Trabzonspor Arma', price: 300, effect: 0, image: require('./assets/shop/emblem_ts.webp'), emoji: '⚓', description: 'Fırtına' },
+        { id: 'mirror_gold', name: 'Altın Zincir', price: 1000, effect: 8, image: require('./assets/shop/mirror_gold.webp'), emoji: '⛓️', description: 'Lüks görünüm' },
+        { id: 'mirror_led', name: 'LED Işıklı Logo', price: 2000, effect: 12, image: require('./assets/shop/mirror_led.webp'), emoji: '💡', description: 'Gece efekti' },
     ],
     rosary: [
-        { id: 'rosary_plastic', name: 'Plastik Tesbih', price: 0, effect: 0, image: require('./assets/shop/rosary_plastic.png'), emoji: '📿', description: 'Başlangıç', owned: true },
-        { id: 'rosary_amber', name: 'Kehribar Tesbih', price: 500, effect: 5, image: require('./assets/shop/rosary_amber.png'), emoji: '🟠', description: '+%5 itibar' },
-        { id: 'rosary_silver', name: 'Gümüş Tesbih', price: 1500, effect: 10, image: require('./assets/shop/rosary_silver.png'), emoji: '⚪', description: '+%10 itibar' },
-        { id: 'rosary_gold', name: 'Altın Tesbih', price: 5000, effect: 20, image: require('./assets/shop/rosary_gold.png'), emoji: '🟡', description: '+%20 itibar' },
+        { id: 'rosary_plastic', name: 'Plastik Tesbih', price: 0, effect: 0, image: require('./assets/shop/rosary_plastic.webp'), emoji: '📿', description: 'Başlangıç', owned: true },
+        { id: 'rosary_amber', name: 'Kehribar Tesbih', price: 500, effect: 5, image: require('./assets/shop/rosary_amber.webp'), emoji: '🟠', description: '+%5 itibar' },
+        { id: 'rosary_silver', name: 'Gümüş Tesbih', price: 1500, effect: 10, image: require('./assets/shop/rosary_silver.webp'), emoji: '⚪', description: '+%10 itibar' },
+        { id: 'rosary_gold', name: 'Altın Tesbih', price: 5000, effect: 20, image: require('./assets/shop/rosary_gold.webp'), emoji: '🟡', description: '+%20 itibar' },
     ],
 };
 

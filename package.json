@@ -7,8 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "optimize:images": "node scripts/optimize-images-webp.js --quality=80",
-    "optimize:images:dry": "node scripts/optimize-images-webp.js --quality=80 --dry-run"
+    "optimize:images": "powershell -ExecutionPolicy Bypass -File .\\scripts\\optimize-images-webp.ps1 -Quality 80",
+    "optimize:images:dry": "powershell -ExecutionPolicy Bypass -File .\\scripts\\optimize-images-webp.ps1 -Quality 80 -DryRun"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

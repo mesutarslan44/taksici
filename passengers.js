@@ -7,7 +7,7 @@ export const PASSENGERS = [
         id: 1,
         name: "Yaşlı Teyze",
         avatar: "👵",
-        image: require('./assets/characters/yasli_teyze.png'),
+        image: require('./assets/characters/yasli_teyze.webp'),
         location: "Üsküdar",
         time: "09:00",
         intro: "Küçük, çiçekli bir bohça taşıyan 70'li yaşlarında bir teyze. Gözleri yaşlı, elleri titriyor. Taksiye binerken 'Bismillah' diyor ve camdan dışarıya, sanki burada olmayan bir yere bakıyor.",
@@ -290,7 +290,7 @@ export const PASSENGERS = [
         id: 2,
         name: "Üniversiteli Kız",
         avatar: "👩‍🎓",
-        image: require('./assets/characters/universiteli_kiz.png'),
+        image: require('./assets/characters/universiteli_kiz.webp'),
         location: "Kadıköy",
         time: "08:30",
         intro: "Kucağında kalın ders kitapları, saçları darmadağın. Gözlerinin altı mosmor, belli ki hiç uyumamış. Nefes nefese taksiye binip kapıyı çarpıyor.",
@@ -532,7 +532,7 @@ export const PASSENGERS = [
         id: 3,
         name: "Gizemli Adam",
         avatar: "🕴️",
-        image: require('./assets/characters/gizemli_adam.png'),
+        image: require('./assets/characters/gizemli_adam.webp'),
         location: "Taksim",
         time: "23:45",
         intro: "Gece yarısı olmasına rağmen güneş gözlüğü takıyor. Siyah, pahalı bir takım elbisesi var. Elinde metal bir çanta. Taksiye bindiği an araçtaki hava soğuyor.",
@@ -748,7 +748,7 @@ export const PASSENGERS = [
         id: 4,
         name: "Sarhoş Damat",
         avatar: "🤵",
-        image: require('./assets/characters/sarhos_damat.png'),
+        image: require('./assets/characters/sarhos_damat.webp'),
         location: "Beşiktaş",
         time: "03:00",
         intro: "Papyonu çözülmüş, ceketini omzuna atmış. Elinde yarı dolu bir şampanya şişesi. Yürümekte zorlanıyor. 'Kaçtım ulan! Kaçtııım!' diye bağırarak kendini arka koltuğa atıyor.",
@@ -1014,7 +1014,7 @@ export const PASSENGERS = [
         id: 5,
         name: "Kavgacı Çift",
         avatar: "💔",
-        image: require('./assets/characters/kavgaci_cift.png'),
+        image: require('./assets/characters/kavgaci_cift.webp'),
         location: "Şişli",
         time: "22:00",
         intro: "Bir kadın ve erkek bindi. Kadın hıçkırarak ağlıyor, adamın yüzü kıpkırmızı. Kadın: 'Bana dokunma!' diye bağırıyor. Araba barut fıçısı gibi.",
@@ -1240,7 +1240,7 @@ export const PASSENGERS = [
         id: 6,
         name: "Yaralı Fedai",
         avatar: "🩸",
-        image: require('./assets/characters/yarali_fedai.png'),
+        image: require('./assets/characters/yarali_fedai.webp'),
         location: "Fatih",
         time: "02:30",
         intro: "Kapıyı zor açtı. Göğsünden kan sızıyor, nefes almakta zorlanıyor. Gömleği kıpkırmızı. Elinde bir silah belirdi ama hemen sakladı.",
@@ -1442,7 +1442,7 @@ export const PASSENGERS = [
         id: 7,
         name: "Gurbet Amca",
         avatar: "👴",
-        image: require('./assets/characters/gurbet_amca.png'),
+        image: require('./assets/characters/gurbet_amca.webp'),
         location: "Havalimanı",
         time: "04:00",
         intro: "70 yaşlarında, yorgun gözlü. Elinde 80'lerden kalma eski bir valiz. 'Evladım, Eminönü\'ne gidelim. 40 yıldır görmedim İstanbul\'u.'",
@@ -1627,7 +1627,7 @@ export const PASSENGERS = [
         id: 8,
         name: "Acil Doktoru",
         avatar: "👨‍⚕️",
-        image: require('./assets/characters/acil_doktor.png'),
+        image: require('./assets/characters/acil_doktor.webp'),
         location: "Hastane",
         time: "06:00",
         intro: "Gözleri kan çanağı gibi, elleri hafifçe titriyor. Üzerinde kan lekesi kalmış bir önlük var. 'Eve... Çerkezköy... Sadece uyumak istiyorum...'",
@@ -1812,7 +1812,7 @@ export const PASSENGERS = [
         id: 9,
         name: "Kayıp Çocuk",
         avatar: "👧",
-        image: require('./assets/characters/kayip_cocuk.png'),
+        image: require('./assets/characters/kayip_cocuk.webp'),
         location: "Beyazıt",
         time: "19:00",
         intro: "8-9 yaşlarında bir kız çocuğu. Kaldırımın kenarında ağlıyor. Yanında kimse yok. Elini ürkekçe kaldırdı.",
@@ -2008,7 +2008,7 @@ export const PASSENGERS = [
         id: 10,
         name: "Kaçak Banker",
         avatar: "💼",
-        image: require('./assets/characters/kacak_banker.png'),
+        image: require('./assets/characters/kacak_banker.webp'),
         location: "Levent",
         time: "10:00",
         intro: "Çok şık giyimli, elinde kilitli büyük bir çanta var. Ter içinde. Sürekli arkasına ve saatine bakıyor. 'Boş mu? Çabuk! Hemen sür!'",
@@ -2204,7 +2204,7 @@ export const PASSENGERS = [
         id: 11,
         name: "Gizli Tanık",
         avatar: "bo",
-        image: require('./assets/characters/gizli_tanik.png'),
+        image: require('./assets/characters/gizli_tanik.webp'),
         location: "Kadıköy",
         time: "14:00",
         intro: "Kapüşonlu, güneş gözlüklü. Titriyor. Sürekli saatine ve etrafına bakıyor. 'Çağlayan Adliyesi... Çabuk! Yoksa öleceğiz!'",
@@ -2400,7 +2400,7 @@ export const PASSENGERS = [
         id: 12,
         name: "Doğum Sancısı",
         avatar: "🤰",
-        image: require('./assets/characters/dogum_sancisi.png'),
+        image: require('./assets/characters/dogum_sancisi.webp'),
         location: "Esenler",
         time: "02:00",
         intro: "Hamile kadın (Ayşe) ve kocası (Selim). Kadın iki büklüm, çığlık atıyor. Adam panikten ne yapacağını şaşırmış. 'SU GELDİ! ÇABUK!'",
@@ -2568,7 +2568,7 @@ export const PASSENGERS = [
         id: 13,
         name: "Emekli Başkomiser",
         avatar: "👮",
-        image: require('./assets/characters/emekli_baskomiser.png'),
+        image: require('./assets/characters/emekli_baskomiser.webp'),
         location: "Bakırköy",
         time: "11:00",
         intro: "60'lı yaşlarda, çelik gibi sert bakışlı. Elinde bir buket karanfil var. 'Merkezefendi Mezarlığı'na evlat... Eşimi bekletmeyelim.'",
@@ -2736,7 +2736,7 @@ export const PASSENGERS = [
         id: 14,
         name: "Fanatik Holigan",
         avatar: "⚽",
-        image: require('./assets/characters/fanatik_holigan.png'),
+        image: require('./assets/characters/fanatik_holigan.webp'),
         location: "Taksim",
         time: "23:00",
         intro: "Formasını giymiş, yüzü boyalı, atkı bağlamış. Elinde yarı sönmüş bir meşale var. 'KADIKÖY! ŞAMPİYON! ÇEK KADIKÖY'E!'",
@@ -2894,7 +2894,7 @@ export const PASSENGERS = [
         id: 15,
         name: "Depresif Müzisyen",
         avatar: "🎸",
-        image: require('./assets/characters/depresif_muzisyen.png'),
+        image: require('./assets/characters/depresif_muzisyen.webp'),
         location: "Beyoğlu",
         time: "04:00",
         intro: "Sırtında gitar çantası, üstü başı dağınık. Gözleri boşluğa bakıyor. Fısıldayarak: 'Köprüye... Boğaz Köprüsü'ne...'",
@@ -3077,7 +3077,7 @@ export const PASSENGERS = [
         id: 16,
         name: "Şüpheli Kurye",
         avatar: "📦",
-        image: require('./assets/characters/supheli_kurye.png'),
+        image: require('./assets/characters/supheli_kurye.webp'),
         location: "Zeytinburnu",
         time: "01:30",
         intro: "Elinde dondurucu özellikli metal bir çanta. Alnından ter damlıyor. 'Sarıyer'e! Çok acil! Durma sakın!'",
@@ -3269,7 +3269,7 @@ export const PASSENGERS = [
         id: 17,
         name: "Kaçak Aşıklar",
         avatar: "💑",
-        image: require('./assets/characters/kacak_asiklar.png'),
+        image: require('./assets/characters/kacak_asiklar.webp'),
         location: "Ataşehir",
         time: "03:00",
         intro: "Nefes nefese genç bir çift. Kızın gelinliği yırtık, oğlanın gömleği kanlı. 'Sür abi! Abimler peşimizde! Öldürecekler!'",
@@ -3410,7 +3410,7 @@ export const PASSENGERS = [
         id: 18,
         name: "Defineci Dayı",
         avatar: "🗺️",
-        image: require('./assets/characters/defineci_dayi.png'),
+        image: require('./assets/characters/defineci_dayi.webp'),
         location: "Sarıyer",
         time: "23:45",
         intro: "Üstü başı çamur içinde, gözleri faltaşı gibi. Elinde paslı bir kürek ve eski harita. 'Belgrad Ormanı! Hemen! Cinler gelmeden!'",
@@ -3572,7 +3572,7 @@ export const PASSENGERS = [
         id: 19,
         name: "Youtuber Velet",
         avatar: "🤳",
-        image: require('./assets/characters/youtuber_velet.png'),
+        image: require('./assets/characters/youtuber_velet.webp'),
         location: "Nişantaşı",
         time: "15:30",
         intro: "Elinde son model kamera, sürekli konuşuyor. 'Selam Çeteee! Bugün efsane bir vlogla karşınızdayım! Taksi Abi ile MAKAS KRALLIĞI yapacağız!'",
@@ -3703,7 +3703,7 @@ export const PASSENGERS = [
         id: 20,
         name: "Yaralı Fedai",
         avatar: "🕶️",
-        image: require('./assets/characters/gece_kulubu_fedaisi.png'),
+        image: require('./assets/characters/gece_kulubu_fedaisi.webp'),
         location: "Bebek",
         time: "04:30",
         intro: "2 metre boyunda, takım elbiseli bir dev. Ama gömleği kan içinde. 'Hastaneye değil... Depoya sür. Kimse görmesin.'",
@@ -3845,7 +3845,7 @@ export const PASSENGERS = [
         id: 21,
         name: "Falcı Kadın",
         avatar: "🔮",
-        image: require('./assets/characters/falci_kadin.png'),
+        image: require('./assets/characters/falci_kadin.webp'),
         location: "Fatih",
         time: "16:00",
         intro: "Mor şallar içinde, elinde tarot kartları. 'Evladım seni bekliyordum... Gel, Sultanahmet'e gidelim.'",
@@ -3866,7 +3866,7 @@ export const PASSENGERS = [
         id: 22,
         name: "Turist Çift",
         avatar: "🧳",
-        image: require('./assets/characters/turist_cift.png'),
+        image: require('./assets/characters/turist_cift.webp'),
         location: "Sultanahmet",
         time: "10:00",
         intro: "Amerikalı çift, harita ellerinde. 'Hello! Galata Tower please! We are lost!'",
@@ -3889,7 +3889,7 @@ export const PASSENGERS = [
         id: 23,
         name: "Piyango Talihlisi",
         avatar: "🎰",
-        image: require('./assets/characters/piyango_talihlisi.png'),
+        image: require('./assets/characters/piyango_talihlisi.webp'),
         location: "Bakırköy",
         time: "14:00",
         intro: "Elinde piyango bileti, eller titriyor. 'Abi kazandım! 1 MİLYON LİRA! Milli Piyango'ya git!'",
@@ -3911,7 +3911,7 @@ export const PASSENGERS = [
         id: 24,
         name: "Keko Timi",
         avatar: "🚬",
-        image: require('./assets/characters/keko_timi.png'),
+        image: require('./assets/characters/keko_timi.webp'),
         location: "Bağcılar",
         time: "23:00",
         intro: "3 kişi bindiler. Eşofmanlılar, çok gürültülüler. 'ABIIII! Beşiktaş'a bas! Kafa yapacağız!'",
@@ -3937,7 +3937,7 @@ export const PASSENGERS = [
         id: 25,
         name: "Uzaylı (Kılık Değiştirmiş)",
         avatar: "👽",
-        image: require('./assets/characters/uzayli.png'),
+        image: require('./assets/characters/uzayli.webp'),
         location: "Orman Yolu",
         time: "04:00",
         intro: "İnsana benziyor ama teni hafif yeşil mi? Gözlerini hiç kırpmıyor. 'Havalimanı. Acil.'",
@@ -3963,7 +3963,7 @@ export const PASSENGERS = [
         id: 26,
         name: "Pizzacı Çocuk",
         avatar: "🍕",
-        image: require('./assets/characters/pizzaci_cocuk.png'),
+        image: require('./assets/characters/pizzaci_cocuk.webp'),
         location: "Levent",
         time: "19:50",
         intro: "Motoru bozulmuş. Elinde 5 kutu pizza. Ağlamak üzere. 'Abi 10 dakikaya yetiştirmem lazım!'",
@@ -3986,7 +3986,7 @@ export const PASSENGERS = [
         id: 27,
         name: "Düğünden Kaçan Gelin",
         avatar: "👰",
-        image: require('./assets/characters/dugun_gelin.png'),
+        image: require('./assets/characters/dugun_gelin.webp'),
         location: "Çamlıca",
         time: "00:30",
         intro: "Gelinlik içinde, makyaj akmış. 'Beni uzağa götür abi... En uzağa...'",
@@ -4007,7 +4007,7 @@ export const PASSENGERS = [
         id: 28,
         name: "Mafya Babası",
         avatar: "🎩",
-        image: require('./assets/characters/mafya_babasi.png'),
+        image: require('./assets/characters/mafya_babasi.webp'),
         location: "Nişantaşı",
         time: "02:00",
         intro: "Pahalı takım elbise, altın yüzükler. 2 koruma yanında. 'Şoför, Kartal'a süresin var. Ağzını sıkı tut.'",
@@ -4029,7 +4029,7 @@ export const PASSENGERS = [
         id: 29,
         name: "Çılgın Bilim Adamı",
         avatar: "🧪",
-        image: require('./assets/characters/cilgin_bilim_adami.png'),
+        image: require('./assets/characters/cilgin_bilim_adami.webp'),
         location: "Pendik",
         time: "03:00",
         intro: "Laboratuvar önlüğü, dağınık saçlar. Elinde tuhaf bir kutu. 'TÜBİTAK'a! Acil! Dünya tehlikede!'",
@@ -4054,7 +4054,7 @@ export const PASSENGERS = [
         id: 30,
         name: "Gece Vardiyası Polis",
         avatar: "👮‍♂️",
-        image: require('./assets/characters/gece_polis.png'),
+        image: require('./assets/characters/gece_polis.webp'),
         location: "Eminönü",
         time: "05:30",
         intro: "Yorgun bir polis memuru. Üniforma kirli. 'Evime götür şoför. Sarıgazi. 16 saat mesai yaptım.'",
@@ -4072,7 +4072,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 31: AĞLAYAN PALYAÇO =====
     {
         id: 31, name: "Ağlayan Palyaço", avatar: "🤡",
-        image: require('./assets/characters/aglayan_palyaco.png'),
+        image: require('./assets/characters/aglayan_palyaco.webp'),
         location: "Bakırköy", time: "23:00",
         intro: "Palyaço kostümüyle. Makyaj akmış. 'Eve götür beni... Çocuk partisinden kovuldum...'",
         dialogue: [
@@ -4092,7 +4092,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 32: KAYIP TURİST (AJAN?) =====
     {
         id: 32, name: "Kayıp Turist (Ajan?)", avatar: "🕵️",
-        image: require('./assets/characters/kayip_turist_ajan.png'),
+        image: require('./assets/characters/kayip_turist_ajan.webp'),
         location: "Taksim", time: "02:00",
         intro: "Yabancı aksanı var ama çok iyi Türkçe. 'Konsolosluk. Acil. Takip ediliyorum.'",
         dialogue: [
@@ -4112,7 +4112,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 33: INSTAGRAM FENOMENİ =====
     {
         id: 33, name: "Instagram Fenomeni", avatar: "📸",
-        image: require('./assets/characters/instagram_fenomeni.png'),
+        image: require('./assets/characters/instagram_fenomeni.webp'),
         location: "Bebek", time: "14:00",
         intro: "Selfie çubuğu, ring light. 'Abi yavaş git, içerik çekiyorum!'",
         dialogue: [
@@ -4132,7 +4132,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 34: OPERA SANATÇISI =====
     {
         id: 34, name: "Opera Sanatçısı", avatar: "🎭",
-        image: require('./assets/characters/opera_sanatcisi.png'),
+        image: require('./assets/characters/opera_sanatcisi.webp'),
         location: "Harbiye", time: "22:30",
         intro: "Uzun elbise, saç topuz. 'AKM'ye! Perde 10 dakikaya!'",
         dialogue: [
@@ -4151,7 +4151,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 35: FİRARİ MAHKUM =====
     {
         id: 35, name: "Firari Mahkum", avatar: "⛓️",
-        image: require('./assets/characters/firari_mahkum.png'),
+        image: require('./assets/characters/firari_mahkum.webp'),
         location: "Maltepe", time: "03:00",
         intro: "Yırtık kıyafetler, korku dolu gözler. 'Sınıra götür. Para var.'",
         dialogue: [
@@ -4172,7 +4172,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 36: GİZLİ GURME =====
     {
         id: 36, name: "Gizli Gurme", avatar: "🍽️",
-        image: require('./assets/characters/gizli_gurme.png'),
+        image: require('./assets/characters/gizli_gurme.webp'),
         location: "Kadikoy", time: "20:00",
         intro: "Not defteri, şüpheli bakışlar. 'En iyi kokoreçe götür. Araştırma yapıyorum.'",
         dialogue: [
@@ -4191,7 +4191,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 37: UNUTKAN DEDE =====
     {
         id: 37, name: "Unutkan Dede", avatar: "👴",
-        image: require('./assets/characters/unutkan_dede.png'),
+        image: require('./assets/characters/unutkan_dede.webp'),
         location: "Fatih", time: "10:00",
         intro: "80 yaşlarında, şaşkın. 'Evladım... Ben nereye gidiyordum?'",
         dialogue: [
@@ -4211,7 +4211,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 38: HAMİLE KEDİLİ KADIN =====
     {
         id: 38, name: "Hamile Kedili Kadın", avatar: "🐱",
-        image: require('./assets/characters/hamile_kedili_kadin.png'),
+        image: require('./assets/characters/hamile_kedili_kadin.webp'),
         location: "Sisli", time: "01:00",
         intro: "Hamile ve kucağında hamile kedi. 'Veterinere! Kedi doğuruyor!'",
         dialogue: [
@@ -4230,7 +4230,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 39: ESKİ SEVGİLİ =====
     {
         id: 39, name: "Eski Sevgili", avatar: "💔",
-        image: require('./assets/characters/eski_sevgili.png'),
+        image: require('./assets/characters/eski_sevgili.webp'),
         location: "Besiktas", time: "23:30",
         intro: "Tanıdık bir yüz... 10 yıl önceki aşkın binmiş taksine. 'Merhaba... Seni hatırladım.'",
         dialogue: [
@@ -4251,7 +4251,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 40: ŞÜPHELİ TAKIM ELBİSELİ =====
     {
         id: 40, name: "Şüpheli Takım Elbiseli", avatar: "🕴️",
-        image: require('./assets/characters/supheli_takim_elbiseli.png'),
+        image: require('./assets/characters/supheli_takim_elbiseli.webp'),
         location: "Levent", time: "19:00",
         intro: "Pahalı takım ama gergin. 'Sarıyer. Ve hiç konuşma.'",
         dialogue: [
@@ -4271,7 +4271,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 41: GİZEMLİ KADIN (CİN?) =====
     {
         id: 41, name: "Gizemli Kadın (Cin?)", avatar: "👻",
-        image: require('./assets/characters/gizemli_kadin_cin.png'),
+        image: require('./assets/characters/gizemli_kadin_cin.webp'),
         location: "Belgrad Ormani", time: "03:00",
         intro: "Beyaz elbiseli, solgun tenli. 'Köye götür beni... Sabaha kadar ulaşmalıyım.'",
         dialogue: [
@@ -4292,7 +4292,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 42: ZAMANDA YOLCU =====
     {
         id: 42, name: "Zamanda Yolcu", avatar: "⏰",
-        image: require('./assets/characters/zamanda_yolcu.png'),
+        image: require('./assets/characters/zamanda_yolcu.webp'),
         location: "Sultanahmet", time: "23:59",
         intro: "Eski püşkü kıyafetler ama lüks saat. 'Sabiha Gökçen. 2 saatim var. 1955'e dönmeliyim.'",
         dialogue: [
@@ -4313,7 +4313,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 43: SARHOŞ DAMAT 2 =====
     {
         id: 43, name: "Düğünden Kaçan Damat 2", avatar: "🤵",
-        image: require('./assets/characters/sarhos_damat_2.png'),
+        image: require('./assets/characters/sarhos_damat_2.webp'),
         location: "Florya", time: "01:00",
         intro: "Smokin, papyon çözülmüş. 'Abi oluyorum! Düğün iptal! Kaç!'",
         dialogue: [
@@ -4333,7 +4333,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 44: KEDİ SEVEN TEYZE =====
     {
         id: 44, name: "Kedi Seven Teyze", avatar: "🐈",
-        image: require('./assets/characters/kedi_seven_teyze.png'),
+        image: require('./assets/characters/kedi_seven_teyze.webp'),
         location: "Kadikoy", time: "18:00",
         intro: "Kollarında 3 kedi. 'Veterinere! Hepsinin aşı günü!'",
         dialogue: [
@@ -4353,7 +4353,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 45: KAYKAYCII GENÇ =====
     {
         id: 45, name: "Kaykaycı Genç", avatar: "🛹",
-        image: require('./assets/characters/kaykayci_genc.png'),
+        image: require('./assets/characters/kaykayci_genc.webp'),
         location: "Macka", time: "22:00",
         intro: "Kaykay kırık, diz kanıyor. 'Hastaneye abi! Yarışmam var yarın!'",
         dialogue: [
@@ -4372,7 +4372,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 46: ROMANTİK GENÇ =====
     {
         id: 46, name: "Romantik Genç", avatar: "💐",
-        image: require('./assets/characters/romantik_genc.png'),
+        image: require('./assets/characters/romantik_genc.webp'),
         location: "Besiktas", time: "19:00",
         intro: "Elinde dev çiçek buketi. 'Kız arkadaşımın evine! Evlenme teklifi yapacağım!'",
         dialogue: [
@@ -4394,7 +4394,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 47: BITCOIN MİLYONERİ =====
     {
         id: 47, name: "Bitcoin Milyoneri", avatar: "₿",
-        image: require('./assets/characters/bitcoin_milyoneri.png'),
+        image: require('./assets/characters/bitcoin_milyoneri.webp'),
         location: "Etiler", time: "16:00",
         intro: "Genc, rahat kiyafetler ama luks saat. 'Levente. Lamborghini almaya!'",
         dialogue: [
@@ -4414,7 +4414,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 48: HAYALET AVCISI =====
     {
         id: 48, name: "Hayalet Avcısı", avatar: "👻",
-        image: require('./assets/characters/hayalet_avcisi.png'),
+        image: require('./assets/characters/hayalet_avcisi.webp'),
         location: "Rumeli Hisari", time: "22:00",
         intro: "Garip aletler, siyah kıyafet. 'Belgrad Ormanı! Paranormal aktivite var!'",
         dialogue: [
@@ -4434,7 +4434,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 49: SÜRPRİZ YUMURTA =====
     {
         id: 49, name: "Sürpriz Yumurta", avatar: "🥚",
-        image: require('./assets/characters/surpriz_yumurta.png'),
+        image: require('./assets/characters/surpriz_yumurta.webp'),
         location: "Bagdat Caddesi", time: "12:00",
         intro: "Çocuk doğum günü kostümü: Dev yumurta. 'Partiye yetişmeliyim! Animatörüm!'",
         dialogue: [
@@ -4453,7 +4453,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 50: ÖZEL DEDEKTİF =====
     {
         id: 50, name: "Özel Dedektif", avatar: "🔍",
-        image: require('./assets/characters/ozel_dedektif.png'),
+        image: require('./assets/characters/ozel_dedektif.webp'),
         location: "Karakoy", time: "21:00",
         intro: "Trençkot, şapka. 'Takip ediyorum birini. Yalnızca sür, soru sorma.'",
         dialogue: [
@@ -4474,7 +4474,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 51: EMEKLİ KAPTAN =====
     {
         id: 51, name: "Emekli Kaptan", avatar: "⚓",
-        image: require('./assets/characters/emekli_kaptan.png'),
+        image: require('./assets/characters/emekli_kaptan.webp'),
         location: "Kadikoy", time: "16:00",
         intro: "Denizci şapkası, yüzünde sigara. 'Limana götür evlat. Son vapur kalkıyor.'",
         dialogue: [
@@ -4492,7 +4492,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 52: SINAV OGRENCİSİ =====
     {
         id: 52, name: "Sınav Öğrencisi", avatar: "📚",
-        image: require('./assets/characters/sinav_ogrencisi.png'),
+        image: require('./assets/characters/sinav_ogrencisi.webp'),
         location: "Besiktas", time: "07:30",
         intro: "Kitaplar kolunda, gözler kırmızı. 'YKS merkezi! 30 dakika var!'",
         dialogue: [
@@ -4510,7 +4510,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 53: SOKAK MÜZİSYENİ =====
     {
         id: 53, name: "Sokak Müzisyeni", avatar: "🎺",
-        image: require('./assets/characters/sokak_muzisyeni.png'),
+        image: require('./assets/characters/sokak_muzisyeni.webp'),
         location: "Istiklal", time: "00:30",
         intro: "Elinde saksafon, şapka para dolu. 'Limana götür. Gemi kalkıyor.'",
         dialogue: [
@@ -4529,7 +4529,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 54: ALMANCI DAYI =====
     {
         id: 54, name: "Almancı Dayı", avatar: "🇩🇪",
-        image: require('./assets/characters/almanci_dayi.png'),
+        image: require('./assets/characters/almanci_dayi.webp'),
         location: "Havalimani", time: "09:00",
         intro: "Mercedes şapkası, kalın palto. 'Köye götür! Memleketi görmeyeli 10 yıl!'",
         dialogue: [
@@ -4547,7 +4547,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 55: AVM ÇOCUĞU =====
     {
         id: 55, name: "AVM Çocuğu", avatar: "👦",
-        image: require('./assets/characters/kaybolan_cocuk.png'),
+        image: require('./assets/characters/kaybolan_cocuk.webp'),
         location: "AVM", time: "18:00",
         intro: "8-9 yaşında, ağlıyor. 'Amca annemi kaybettim!'",
         dialogue: [
@@ -4565,7 +4565,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 56: ANTİKACI =====
     {
         id: 56, name: "Antikacı", avatar: "🏺",
-        image: require('./assets/characters/antikaci.png'),
+        image: require('./assets/characters/antikaci.webp'),
         location: "Cukurcuma", time: "11:00",
         intro: "Eski kıyafetler, elinde paha biçilmez görünen bir vazo. 'Müzeye! Keşfettim!'",
         dialogue: [
@@ -4585,7 +4585,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 57: ÜNLÜ YAZAR =====
     {
         id: 57, name: "Ünlü Yazar", avatar: "📝",
-        image: require('./assets/characters/unlu_yazar.png'),
+        image: require('./assets/characters/unlu_yazar.webp'),
         location: "Bebek", time: "16:00",
         intro: "Eski model gözlük, dağınık saç. 'Yayın evine. Yeni kitap teslimi!'",
         dialogue: [
@@ -4603,7 +4603,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 58: YORGUN HEMŞİRE =====
     {
         id: 58, name: "Yorgun Hemşire", avatar: "👩‍⚕️",
-        image: require('./assets/characters/yorgun_hemsire.png'),
+        image: require('./assets/characters/yorgun_hemsire.webp'),
         location: "Hastane", time: "06:00",
         intro: "Göz altları mor, ayakta zor duruyor. 'Eve... 36 saat mesai...'",
         dialogue: [
@@ -4622,7 +4622,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 59: TARTIŞMALI ÇİFT =====
     {
         id: 59, name: "Tartışmalı Çift", avatar: "💥",
-        image: require('./assets/characters/kavgaci_cift.png'),
+        image: require('./assets/characters/kavgaci_cift.webp'),
         location: "Kadıköy", time: "22:00",
         intro: "Birbirlerine bağırıyorlar. 'Taksiyi ben gördüm!', 'Hayır ben el kaldırdım!'",
         dialogue: [
@@ -4643,7 +4643,7 @@ export const PASSENGERS = [
     // ===== KARAKTER 60: GECE SEYYAHİ =====
     {
         id: 60, name: "Gece Seyyahı", avatar: "🎭",
-        image: require('./assets/characters/gizemli_adam.png'),
+        image: require('./assets/characters/gizemli_adam.webp'),
         location: "Galata Kulesi", time: "23:59",
         intro: "Siyah palto, sapka, yuz gorunmuyor. 'Eminonu. Sessizce.'",
         dialogue: [
